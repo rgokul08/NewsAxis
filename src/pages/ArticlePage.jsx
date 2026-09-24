@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
-  Bookmark, Share2, Clock, Calendar, ShieldCheck, 
+  Bookmark, Share2, ShieldCheck, 
   ExternalLink, Volume2, VolumeX, Printer, MessageSquare, 
   ArrowLeft, Heart, ThumbsUp, Sparkles, AlertCircle 
 } from 'lucide-react';
@@ -200,10 +200,15 @@ export function ArticlePage() {
             </button>
             <button
               onClick={handleShare}
-              title="Share"
-              className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              title={copied ? "Link Copied!" : "Share"}
+              className="relative p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
             >
               <Share2 className="w-4 h-4" />
+              {copied && (
+                <span className="absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-[10px] font-sans font-bold px-1.5 py-0.5 rounded shadow whitespace-nowrap">
+                  Copied!
+                </span>
+              )}
             </button>
             <button
               onClick={() => window.print()}

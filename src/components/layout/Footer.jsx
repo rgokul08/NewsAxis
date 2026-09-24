@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Flame, ShieldCheck, Heart, Globe, Share2, Mail } from 'lucide-react';
-import { APP_CONFIG } from '../../config/appConfig';
+import { Flame, ShieldCheck, Globe, Share2, Mail } from 'lucide-react';
 import { CATEGORIES } from '../../constants/categories';
 
 export function Footer() {

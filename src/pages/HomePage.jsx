@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  TrendingUp, Sparkles, Flame, Clock, Compass, 
-  ArrowRight, ShieldCheck, Mail, CheckCircle2, ChevronRight, Bookmark
+  TrendingUp, Sparkles, Flame, 
+  ArrowRight, ShieldCheck, Mail, ChevronRight 
 } from 'lucide-react';
 import { articleService } from '../services/articleService';
 import { BreakingTicker } from '../components/news/BreakingTicker';
 import { ArticleCard } from '../components/article/ArticleCard';
-import { CATEGORIES } from '../constants/categories';
 
 export function HomePage() {
   const [feed, setFeed] = useState({

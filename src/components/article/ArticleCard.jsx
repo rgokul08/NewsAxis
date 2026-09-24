@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Bookmark, Clock, ExternalLink } from 'lucide-react';
+import { Bookmark } from 'lucide-react';
 import { articleService } from '../../services/articleService';
 
 export function ArticleCard({ article, compact = false, showExpiration = false, lead = false }) {

@@ -2,14 +2,13 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
   Search, Moon, Sun, Bookmark, PenSquare, 
-  Menu, X, Shield, User, LogOut, ChevronDown, BookOpen, CloudSun
+  Menu, X, User, ChevronDown, BookOpen, CloudSun
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { CATEGORIES } from '../../constants/categories';
 
 export function Header() {
-  const { user, logout, switchRole } = useAuth();
+  const { user, logout } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
