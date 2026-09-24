@@ -2,13 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   TrendingUp, Sparkles, Flame, 
-  ArrowRight, ShieldCheck, Mail, ChevronRight 
+  ArrowRight, ShieldCheck, Mail, ChevronRight, MapPin 
 } from 'lucide-react';
 import { articleService } from '../services/articleService';
 import { BreakingTicker } from '../components/news/BreakingTicker';
 import { ArticleCard } from '../components/article/ArticleCard';
+import { useGeolocation } from '../hooks/useGeolocation';
 
 export function HomePage() {
+  const { location } = useGeolocation();
   const [feed, setFeed] = useState({
     breaking: [],
     featured: null,
@@ -17,6 +19,7 @@ export function HomePage() {
     communityBlogs: [],
     all: []
   });
+  const [nearbyFeed, setNearbyFeed] = useState({ articles: [], blogs: [] });
   const [loading, setLoading] = useState(true);
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
@@ -34,6 +37,18 @@ export function HomePage() {
     }
     loadFeed();
   }, []);
+
+  useEffect(() => {
+    async function loadNearby() {
+      try {
+        const res = await articleService.getNearbyFeed(location);
+        setNearbyFeed(res);
+      } catch (err) {
+        console.warn('Failed to load nearby feed', err);
+      }
+    }
+    loadNearby();
+  }, [location.city, location.region]);
 
   const handleNewsletterSubmit = (e) => {
     e.preventDefault();
@@ -119,6 +134,58 @@ export function HomePage() {
               ))}
             </div>
           </div>
+        </section>
+
+        {/* 2.5 NEARBY NEWS & REGIONAL BLOGS (GEOLOCATION POWERED) */}
+        <section className="space-y-4 pt-2 pb-6 border-b border-[#e5e7eb] dark:border-[#30363d] bg-slate-50/60 dark:bg-[#161b22]/50 p-4 sm:p-5 rounded-lg">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b-2 border-[#111827] dark:border-[#30363d] pb-2 gap-2">
+            <div className="flex items-center gap-2.5">
+              <span className="p-1.5 rounded-full bg-rose-50 dark:bg-rose-950/40 text-[#a91b0d] dark:text-rose-400">
+                <MapPin className="w-4 h-4" />
+              </span>
+              <div>
+                <h3 className="font-headline text-xl sm:text-2xl font-black text-[#111827] dark:text-white leading-tight">
+                  Nearby News & Regional Dispatches
+                </h3>
+                <span className="text-[11px] font-sans-clean text-slate-500 dark:text-slate-400">
+                  Geo-targeted edition: <strong>{location.city}, {location.region}</strong> ({location.country || 'India'})
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Link 
+                to="/category/tamil-nadu" 
+                className="text-xs font-sans-clean font-bold text-[#a91b0d] dark:text-rose-400 hover:underline flex items-center gap-1"
+              >
+                All Regional Dispatches <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {nearbyFeed.articles.slice(0, 4).map(story => (
+              <ArticleCard key={story.id} article={story} />
+            ))}
+          </div>
+
+          {nearbyFeed.blogs.length > 0 && (
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-800">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-sans-clean font-bold uppercase tracking-wider text-[#a91b0d] dark:text-rose-400 flex items-center gap-1.5">
+                  <Flame className="w-3.5 h-3.5" /> Community Blogs From Your Region
+                </span>
+                <Link to="/write" className="text-xs font-sans-clean font-semibold text-slate-600 dark:text-slate-400 hover:text-[#a91b0d] hover:underline">
+                  Post local report &rarr;
+                </Link>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {nearbyFeed.blogs.slice(0, 2).map(blog => (
+                  <ArticleCard key={blog.id} article={blog} compact showExpiration />
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         {/* 3. INDIA COVERAGE BANNER (THE HINDU EMBLEMATIC SECTION) */}

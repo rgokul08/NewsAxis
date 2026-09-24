@@ -118,6 +118,38 @@ class ArticleService {
   }
 
   /**
+   * Fetches nearby news & community blogs based on user geolocation
+   */
+  async getNearbyFeed(location = {}) {
+    const feed = await this.getHomeFeed();
+    const city = (location.city || '').toLowerCase();
+    const region = (location.region || '').toLowerCase();
+
+    // Match keywords or categories for region/city/state
+    const regional = feed.all.filter(a => {
+      const text = `${a.title || ''} ${a.summary || ''} ${a.content || ''} ${a.categorySlug || ''}`.toLowerCase();
+      if (region && text.includes(region)) return true;
+      if (city && text.includes(city)) return true;
+      if (a.categorySlug === 'india' || a.categorySlug === 'tamil-nadu') return true;
+      return false;
+    });
+
+    // Also include community blogs matching or general nearby community voices
+    const nearbyBlogs = feed.communityBlogs.filter(b => {
+      const text = `${b.title || ''} ${b.summary || ''} ${b.content || ''}`.toLowerCase();
+      if (region && text.includes(region)) return true;
+      if (city && text.includes(city)) return true;
+      return true;
+    });
+
+    return {
+      location,
+      articles: regional.length > 0 ? regional.slice(0, 8) : feed.all.slice(0, 8),
+      blogs: nearbyBlogs.slice(0, 4)
+    };
+  }
+
+  /**
    * Fetches single article by slug
    */
   async getBySlug(slug) {

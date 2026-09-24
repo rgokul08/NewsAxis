@@ -23,7 +23,7 @@ export function ThemeProvider({ children }) {
     localStorage.setItem(THEME_KEY, theme);
 
     // Dynamic Favicon switching for Light & Dark mode
-    const faviconHref = theme === 'dark' ? '/dark1.jpeg' : '/light.jpeg';
+    const faviconHref = theme === 'dark' ? '/dark(1).png' : '/light(1).png';
     let faviconLink = document.querySelector("link[rel~='icon']");
     if (!faviconLink) {
       faviconLink = document.createElement('link');
@@ -31,7 +31,7 @@ export function ThemeProvider({ children }) {
       document.head.appendChild(faviconLink);
     }
     faviconLink.href = faviconHref;
-    faviconLink.type = 'image/jpeg';
+    faviconLink.type = 'image/png';
   }, [theme]);
 
   const toggleTheme = () => {
@@ -39,7 +39,7 @@ export function ThemeProvider({ children }) {
   };
 
   const isDark = theme === 'dark';
-  const logoSrc = isDark ? '/dark1.jpeg' : '/light.jpeg';
+  const logoSrc = isDark ? '/dark(1).png' : '/light(1).png';
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme, toggleTheme, isDark, logoSrc }}>
