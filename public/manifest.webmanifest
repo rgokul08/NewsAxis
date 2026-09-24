@@ -1,0 +1,17 @@
+{
+  "name": "NewsAxis — Discover What Matters",
+  "short_name": "NewsAxis",
+  "description": "Next-generation hybrid news aggregation and 72-hour community publishing platform.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0f19",
+  "theme_color": "#0284c7",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ]
+}

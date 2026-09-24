@@ -1,0 +1,132 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { account, isConfigured } from '../services/appwriteClient';
+import { USER_ROLES } from '../constants/categories';
+
+const AuthContext = createContext(null);
+const LOCAL_USER_KEY = 'newsaxis_auth_user';
+
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Initialize session on mount
+  useEffect(() => {
+    async function checkSession() {
+      if (isConfigured) {
+        try {
+          const currentAccount = await account.get();
+          setUser({
+            id: currentAccount.$id,
+            email: currentAccount.email,
+            name: currentAccount.name,
+            username: currentAccount.name.toLowerCase().replace(/\s+/g, ''),
+            role: USER_ROLES.AUTHOR
+          });
+        } catch {
+          loadLocalUser();
+        }
+      } else {
+        loadLocalUser();
+      }
+      setLoading(false);
+    }
+
+    function loadLocalUser() {
+      try {
+        const saved = localStorage.getItem(LOCAL_USER_KEY);
+        if (saved) {
+          setUser(JSON.parse(saved));
+        } else {
+          // Default state: unauthenticated visitor (no demo auto-login)
+          setUser(null);
+        }
+      } catch (err) {
+        console.warn('Local user loading error', err);
+        setUser(null);
+      }
+    }
+
+
+    checkSession();
+  }, []);
+
+  const login = async (email, password) => {
+    if (isConfigured) {
+      await account.createEmailPasswordSession(email, password);
+      const acc = await account.get();
+      const u = {
+        id: acc.$id,
+        email: acc.email,
+        name: acc.name,
+        username: acc.name.toLowerCase().replace(/\s+/g, ''),
+        role: USER_ROLES.AUTHOR
+      };
+      setUser(u);
+      localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(u));
+      return u;
+    } else {
+      // Local session
+      const u = {
+        id: `usr_${Date.now()}`,
+        email,
+        name: email.split('@')[0],
+        username: email.split('@')[0].toLowerCase(),
+        role: email.includes('admin') ? USER_ROLES.ADMIN : USER_ROLES.AUTHOR,
+        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80'
+      };
+      setUser(u);
+      localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(u));
+      return u;
+    }
+  };
+
+  const signup = async (email, password, name) => {
+    if (isConfigured) {
+      await account.create('unique()', email, password, name);
+      return login(email, password);
+    } else {
+      const u = {
+        id: `usr_${Date.now()}`,
+        email,
+        name,
+        username: name.toLowerCase().replace(/\s+/g, ''),
+        role: USER_ROLES.AUTHOR,
+        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80'
+      };
+      setUser(u);
+      localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(u));
+      return u;
+    }
+  };
+
+  const logout = async () => {
+    if (isConfigured) {
+      try {
+        await account.deleteSession('current');
+      } catch (e) {
+        console.warn('Appwrite logout session deletion', e);
+      }
+    }
+    setUser(null);
+    localStorage.removeItem(LOCAL_USER_KEY);
+  };
+
+  const switchRole = (newRole) => {
+    if (!user) return;
+    const updated = { ...user, role: newRole };
+    setUser(updated);
+    localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(updated));
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, loading, login, signup, logout, switchRole, isAuthenticated: Boolean(user) }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
+  return context;
+}
