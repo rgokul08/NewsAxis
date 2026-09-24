@@ -4,6 +4,12 @@ import { HashnodeProvider } from '../../src/providers/hashnodeProvider.js';
 import { PublicFeedProvider } from '../../src/providers/publicFeedProvider.js';
 import { providerRegistry } from '../../src/providers/index.js';
 
+import { TheNewsApiProvider } from '../../src/providers/theNewsApiProvider.js';
+import { NewsDataProvider } from '../../src/providers/newsDataProvider.js';
+import { MediaStackProvider } from '../../src/providers/mediaStackProvider.js';
+import { NewsApiOrgProvider } from '../../src/providers/newsApiOrgProvider.js';
+import { GNewsProvider } from '../../src/providers/gNewsProvider.js';
+
 describe('NewsAxis Provider Adapters Suite', () => {
   test('DevToProvider normalizes articles accurately', () => {
     const provider = new DevToProvider();
@@ -52,14 +58,92 @@ describe('NewsAxis Provider Adapters Suite', () => {
     expect(normalized.summary).toContain('World leaders agree on new grid resilience measures');
   });
 
-  test('ProviderRegistry contains at least 8 enabled content providers', () => {
+  test('TheNewsApiProvider normalizes items correctly', () => {
+    const provider = new TheNewsApiProvider();
+    const sample = {
+      uuid: 'news_uuid_001',
+      title: 'Global Markets Rally on Tech Surge',
+      description: 'Indices advance across Asian and European bourses.',
+      snippet: 'Indices advance across Asian and European bourses...',
+      url: 'https://example.com/markets-rally',
+      image_url: 'https://example.com/image.jpg',
+      source: 'reuters.com',
+      categories: ['business'],
+      published_at: '2026-09-24T04:00:00Z'
+    };
+    const normalized = provider.normalize(sample);
+    expect(normalized.externalId).toBe('news_uuid_001');
+    expect(normalized.providerId).toBe('thenewsapi');
+    expect(normalized.sourceName).toBe('reuters.com');
+    expect(normalized.categorySlug).toBe('business');
+  });
+
+  test('NewsDataProvider normalizes items correctly', () => {
+    const provider = new NewsDataProvider();
+    const sample = {
+      article_id: 'newsdata_123',
+      title: 'ISRO Unveils Deep Space Exploration Plan',
+      description: 'Mission blueprints for upcoming lunar station.',
+      link: 'https://example.com/isro-update',
+      image_url: 'https://example.com/isro.jpg',
+      source_id: 'thehindu',
+      creator: ['Science Correspondent'],
+      category: ['science'],
+      pubDate: '2026-09-24 07:00:00'
+    };
+    const normalized = provider.normalize(sample);
+    expect(normalized.externalId).toBe('newsdata_123');
+    expect(normalized.providerId).toBe('newsdata');
+    expect(normalized.sourceName).toBe('THEHINDU');
+    expect(normalized.categorySlug).toBe('science');
+  });
+
+  test('MediaStackProvider normalizes items correctly', () => {
+    const provider = new MediaStackProvider();
+    const sample = {
+      title: 'Breakthrough in Quantum Computing Architecture',
+      description: 'Researchers demonstrate room-temperature coherence.',
+      url: 'https://example.com/quantum-news',
+      image: 'https://example.com/quantum.jpg',
+      source: 'Ars Technica',
+      author: 'Tech Reporter',
+      category: 'technology',
+      published_at: '2026-09-24T03:00:00Z'
+    };
+    const normalized = provider.normalize(sample);
+    expect(normalized.externalId).toBe('https://example.com/quantum-news');
+    expect(normalized.providerId).toBe('mediastack');
+    expect(normalized.sourceName).toBe('Ars Technica');
+    expect(normalized.categorySlug).toBe('technology');
+  });
+
+  test('NewsApiOrgProvider normalizes items correctly', () => {
+    const provider = new NewsApiOrgProvider();
+    const sample = {
+      source: { id: 'the-hindu', name: 'The Hindu' },
+      author: 'Editorial Desk',
+      title: 'Parliament Debates New Digital Data Framework',
+      description: 'Key provisions for data sovereignty discussed.',
+      url: 'https://example.com/data-framework',
+      urlToImage: 'https://example.com/parliament.jpg',
+      publishedAt: '2026-09-24T05:30:00Z'
+    };
+    const normalized = provider.normalize(sample);
+    expect(normalized.externalId).toBe('https://example.com/data-framework');
+    expect(normalized.providerId).toBe('newsapi_org');
+    expect(normalized.sourceName).toBe('The Hindu');
+  });
+
+  test('ProviderRegistry contains at least 14 content providers including all 5 APIs', () => {
     const allProviders = providerRegistry.getAll();
-    expect(allProviders.length).toBeGreaterThanOrEqual(8);
+    expect(allProviders.length).toBeGreaterThanOrEqual(14);
 
-    const devProvider = providerRegistry.get('dev_to');
-    expect(devProvider).toBeDefined();
-
-    const techcrunch = providerRegistry.get('techcrunch');
-    expect(techcrunch).toBeDefined();
+    expect(providerRegistry.get('thenewsapi')).toBeDefined();
+    expect(providerRegistry.get('gnews')).toBeDefined();
+    expect(providerRegistry.get('newsdata')).toBeDefined();
+    expect(providerRegistry.get('mediastack')).toBeDefined();
+    expect(providerRegistry.get('newsapi_org')).toBeDefined();
+    expect(providerRegistry.get('dev_to')).toBeDefined();
+    expect(providerRegistry.get('the_hindu_india')).toBeDefined();
   });
 });

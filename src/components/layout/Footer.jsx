@@ -2,8 +2,11 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Flame, ShieldCheck, Globe, Share2, Mail } from 'lucide-react';
 import { CATEGORIES } from '../../constants/categories';
+import { useTheme } from '../../context/ThemeContext';
 
 export function Footer() {
+  const { logoSrc } = useTheme();
+
   return (
     <footer className="w-full border-t-2 border-[#111827] dark:border-[#30363d] bg-[#f8f9fa] dark:bg-[#161b22] text-[#111827] dark:text-[#f0f6fc] transition-colors pt-10 pb-8 mt-auto font-sans-clean">
       <div className="max-w-[1240px] mx-auto px-4">
@@ -11,13 +14,12 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-5 gap-8 pb-8 border-b border-[#e5e7eb] dark:border-[#30363d]">
           {/* Brand info */}
           <div className="md:col-span-2 space-y-3">
-            <Link to="/" className="inline-block">
-              <span className="font-masthead text-2xl font-black tracking-tight text-[#111827] dark:text-white uppercase">
-                NEWSAXIS
-              </span>
-              <p className="text-[10px] tracking-widest text-[#a91b0d] font-bold uppercase mt-0.5">
-                DISCOVER WHAT MATTERS
-              </p>
+            <Link to="/" className="inline-block py-1">
+              <img 
+                src={logoSrc} 
+                alt="NewsAxis — Discover What Matters" 
+                className="h-12 sm:h-14 w-auto object-contain transition-all duration-300 select-none"
+              />
             </Link>
             <p className="text-xs text-[#4b5563] dark:text-[#8b949e] max-w-sm leading-relaxed font-body-serif">
               A serious, independent digital newspaper combining live external wire dispatches with an ephemeral 72-hour community publishing model.

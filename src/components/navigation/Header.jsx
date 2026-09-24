@@ -9,7 +9,7 @@ import { useTheme } from '../../context/ThemeContext';
 
 export function Header() {
   const { user, logout } = useAuth();
-  const { isDark, toggleTheme } = useTheme();
+  const { isDark, toggleTheme, logoSrc } = useTheme();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -64,10 +64,11 @@ export function Header() {
           {/* Theme switcher */}
           <button
             onClick={toggleTheme}
-            title={isDark ? "Light Mode" : "Dark Mode"}
-            className="p-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
+            title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            aria-label="Toggle visual theme"
+            className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors"
           >
-            {isDark ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5" />}
+            {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
           </button>
 
           {/* Login or User Profile */}
@@ -123,8 +124,8 @@ export function Header() {
         </div>
       </div>
 
-      {/* 2. Main Centered Masthead Header (The Hindu Iconic Style) */}
-      <div className="max-w-[1240px] mx-auto px-4 py-4 sm:py-5 flex items-center justify-between">
+      {/* 2. Main Centered Masthead Header (The Hindu Iconic Style with Authentic Crest Logo) */}
+      <div className="max-w-[1240px] mx-auto px-4 py-3 sm:py-4 flex items-center justify-between">
         <div className="w-24 hidden md:block">
           {/* Left Balance Spacer */}
           <Link to="/write" className="text-xs font-serif font-bold text-[#a91b0d] hover:underline flex items-center gap-1">
@@ -132,20 +133,13 @@ export function Header() {
           </Link>
         </div>
 
-        {/* Center Masthead */}
-        <Link to="/" className="text-center group flex flex-col items-center mx-auto">
-          <div className="flex items-center justify-center gap-2 sm:gap-4">
-            <span className="font-masthead text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-[#111827] dark:text-[#f0f6fc] uppercase select-none">
-              NEWSAXIS
-            </span>
-          </div>
-          <div className="flex items-center gap-2 mt-1">
-            <div className="h-[1px] w-12 bg-slate-300 dark:bg-slate-700" />
-            <span className="text-[10px] sm:text-xs tracking-[0.25em] font-serif uppercase text-[#4b5563] dark:text-[#8b949e]">
-              DISCOVER WHAT MATTERS
-            </span>
-            <div className="h-[1px] w-12 bg-slate-300 dark:bg-slate-700" />
-          </div>
+        {/* Center Masthead with Theme-Adaptive Logo */}
+        <Link to="/" className="text-center group flex flex-col items-center mx-auto py-1">
+          <img
+            src={logoSrc}
+            alt="NewsAxis — Discover What Matters"
+            className="h-16 sm:h-20 md:h-24 w-auto object-contain transition-all duration-300 drop-shadow-sm select-none"
+          />
         </Link>
 
         {/* Right Search & Bookmark Icons */}

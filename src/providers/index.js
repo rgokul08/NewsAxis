@@ -2,10 +2,27 @@ import { DevToProvider } from './devProvider';
 import { HashnodeProvider } from './hashnodeProvider';
 import { PublicFeedProvider } from './publicFeedProvider';
 import { GNewsProvider } from './gNewsProvider';
+import { TheNewsApiProvider } from './theNewsApiProvider';
+import { NewsDataProvider } from './newsDataProvider';
+import { MediaStackProvider } from './mediaStackProvider';
+import { NewsApiOrgProvider } from './newsApiOrgProvider';
 import { deduplicateArticles } from '../utils/normalizeArticle';
 
 /**
- * Registry of 8+ real-world verified external feeds and API providers
+ * Registry of 14+ real-world verified external feeds and API providers:
+ * - TheNewsAPI
+ * - GNews
+ * - NewsData.io
+ * - Mediastack
+ * - NewsAPI.org
+ * - DEV.to
+ * - Hashnode
+ * - Google News
+ * - The Hindu
+ * - BBC World News
+ * - TechCrunch
+ * - Wired
+ * - Medium
  */
 class ProviderRegistry {
   constructor() {
@@ -15,13 +32,28 @@ class ProviderRegistry {
   }
 
   initProviders() {
-    // 1. DEV.to API (Developer, Coding, Career)
+    // 1. TheNewsAPI (Global curated news API)
+    this.register(new TheNewsApiProvider());
+
+    // 2. GNews API (Google News structured API)
+    this.register(new GNewsProvider());
+
+    // 3. NewsData.io API (Global & India real-time breaking news)
+    this.register(new NewsDataProvider());
+
+    // 4. Mediastack API (Live worldwide news data)
+    this.register(new MediaStackProvider());
+
+    // 5. NewsAPI.org (80k+ source headlines)
+    this.register(new NewsApiOrgProvider());
+
+    // 6. DEV.to API (Developer, Coding, Career)
     this.register(new DevToProvider());
 
-    // 2. Hashnode GraphQL API (Tech, AI, Software Engineering)
+    // 7. Hashnode GraphQL API (Tech, AI, Software Engineering)
     this.register(new HashnodeProvider());
 
-    // 3. Google News RSS - World
+    // 8. Google News RSS - World
     this.register(new PublicFeedProvider({
       id: 'google_news_world',
       name: 'Google News World',
@@ -30,7 +62,7 @@ class ProviderRegistry {
       priority: 1
     }));
 
-    // 4. Google News RSS - Technology & AI
+    // 9. Google News RSS - Technology & AI
     this.register(new PublicFeedProvider({
       id: 'google_news_tech',
       name: 'Google News Tech',
@@ -39,7 +71,7 @@ class ProviderRegistry {
       priority: 2
     }));
 
-    // 5. The Hindu / India National News Feed
+    // 10. The Hindu / India National News Feed
     this.register(new PublicFeedProvider({
       id: 'the_hindu_india',
       name: 'The Hindu',
@@ -48,7 +80,7 @@ class ProviderRegistry {
       priority: 2
     }));
 
-    // 6. BBC World News
+    // 11. BBC World News
     this.register(new PublicFeedProvider({
       id: 'bbc_world',
       name: 'BBC World News',
@@ -57,7 +89,7 @@ class ProviderRegistry {
       priority: 2
     }));
 
-    // 7. TechCrunch (Startups, Funding, AI)
+    // 12. TechCrunch (Startups, Funding, AI)
     this.register(new PublicFeedProvider({
       id: 'techcrunch',
       name: 'TechCrunch',
@@ -66,7 +98,7 @@ class ProviderRegistry {
       priority: 3
     }));
 
-    // 8. Wired Science & Technology
+    // 13. Wired Science & Technology
     this.register(new PublicFeedProvider({
       id: 'wired_science',
       name: 'Wired',
@@ -75,7 +107,7 @@ class ProviderRegistry {
       priority: 3
     }));
 
-    // 9. Medium RSS - Technology Stories
+    // 14. Medium RSS - Technology Stories
     this.register(new PublicFeedProvider({
       id: 'medium_tech',
       name: 'Medium Tech',
@@ -83,9 +115,6 @@ class ProviderRegistry {
       defaultCategory: 'technology',
       priority: 4
     }));
-
-    // 10. GNews Adapter (Configured if API key provided)
-    this.register(new GNewsProvider());
   }
 
   register(provider) {

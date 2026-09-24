@@ -26,10 +26,27 @@ export function SourcesPage() {
             1. External News Feeds
           </h2>
           <p>
-            NewsAxis aggregates headlines and excerpts from approved real-world news feeds and public APIs (including The Hindu, Google News, BBC, TechCrunch, Wired, DEV.to, and Hashnode).
+            NewsAxis aggregates headlines, wire dispatches, and excerpts from leading global news intelligence APIs and verified wire feeds:
           </p>
-          <ul className="list-disc pl-5 space-y-1 text-[#4b5563] dark:text-[#8b949e]">
-            <li>Original source names and direct attribution links are permanently displayed.</li>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            {[
+              { name: 'TheNewsAPI', desc: 'Curated global headlines and regional political & economic reporting' },
+              { name: 'GNews', desc: 'Google News structured real-time search & top categorical headlines' },
+              { name: 'NewsData.io', desc: 'National, Asian, and regional breaking live news intelligence' },
+              { name: 'Mediastack', desc: 'Live global news data across 50+ countries and global wires' },
+              { name: 'NewsAPI.org', desc: 'Over 80,000 international and national verified publishers' },
+              { name: 'The Hindu & BBC', desc: 'Authoritative national and international newspaper wire dispatches' },
+              { name: 'DEV Community & Hashnode', desc: 'Community engineering blogs and technology perspectives' },
+              { name: 'TechCrunch & Wired', desc: 'Venture, startup, AI innovations, and science journalism' }
+            ].map((src, i) => (
+              <div key={i} className="p-3 bg-[#f8f9fa] dark:bg-[#161b22] border border-[#e5e7eb] dark:border-[#30363d] rounded">
+                <span className="font-bold text-[#111827] dark:text-white text-xs font-sans-clean block">{src.name}</span>
+                <span className="text-[11px] text-[#4b5563] dark:text-[#8b949e] font-sans-clean">{src.desc}</span>
+              </div>
+            ))}
+          </div>
+          <ul className="list-disc pl-5 space-y-1 text-[#4b5563] dark:text-[#8b949e] pt-2">
+            <li>Original publisher names and direct attribution links are permanently displayed.</li>
             <li>We do not modify the factual meaning of third-party headlines.</li>
             <li>Users are encouraged to read the full investigation at the original publisher's website.</li>
           </ul>
