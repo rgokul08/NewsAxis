@@ -187,11 +187,42 @@ app.get('/api/news', (req, res) => {
     }
 
     if (search) {
-      const q = search.toLowerCase();
-      filtered = filtered.filter(a =>
-        a.title.toLowerCase().includes(q) ||
-        (a.summary && a.summary.toLowerCase().includes(q))
-      );
+      const q = search.trim().toLowerCase();
+      const tokens = q.split(/\s+/).filter(t => t.length > 1);
+
+      const scored = filtered.map(a => {
+        let score = 0;
+        const titleLower = (a.title || '').toLowerCase();
+        const summaryLower = (a.summary || '').toLowerCase();
+        const contentLower = (a.content || '').toLowerCase();
+        const authorLower = (a.authorName || '').toLowerCase();
+        const sourceLower = (a.sourceName || '').toLowerCase();
+        const catLower = (a.categoryId || a.categorySlug || '').toLowerCase();
+        const tagsLower = Array.isArray(a.tags) ? a.tags.join(' ').toLowerCase() : '';
+
+        // Exact query boosts
+        if (titleLower === q) score += 200;
+        else if (titleLower.includes(q)) score += 100;
+
+        if (summaryLower.includes(q)) score += 50;
+        if (catLower === q || tagsLower.includes(q)) score += 40;
+        if (sourceLower.includes(q) || authorLower.includes(q)) score += 30;
+
+        // Token-level related matching
+        for (const token of tokens) {
+          if (titleLower.includes(token)) score += 25;
+          if (summaryLower.includes(token)) score += 15;
+          if (catLower.includes(token) || tagsLower.includes(token)) score += 10;
+          if (contentLower.includes(token)) score += 5;
+        }
+
+        return { article: a, score };
+      });
+
+      filtered = scored
+        .filter(item => item.score > 0)
+        .sort((a, b) => b.score - a.score || new Date(b.article.publishedAt) - new Date(a.article.publishedAt))
+        .map(item => item.article);
     }
 
     // Partition sections

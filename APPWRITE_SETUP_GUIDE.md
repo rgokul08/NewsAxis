@@ -62,7 +62,11 @@ VITE_THENEWSAPI_KEY=
 ### Step 4: Run the Setup Script
 Run:
 ```bash
+# If your VITE_APPWRITE_PROJECT_ID is in .env.local:
 npm run setup:appwrite
+
+# OR pass your Project ID directly:
+node scripts/setup-appwrite.js <YOUR_PROJECT_ID>
 ```
 
 The script will automatically:

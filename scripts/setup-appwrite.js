@@ -19,22 +19,38 @@ try {
   // Continue
 }
 
+const cliProjectId = process.argv[2];
 const ENDPOINT = process.env.APPWRITE_ENDPOINT || process.env.VITE_APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1';
-const PROJECT_ID = process.env.APPWRITE_PROJECT_ID || process.env.VITE_APPWRITE_PROJECT_ID;
-const API_KEY = process.env.APPWRITE_API_KEY;
+const PROJECT_ID = cliProjectId || process.env.APPWRITE_PROJECT_ID || (process.env.VITE_APPWRITE_PROJECT_ID !== 'newsaxis-prod' ? process.env.VITE_APPWRITE_PROJECT_ID : null);
+const API_KEY = process.env.APPWRITE_API_KEY || 'standard_8d908df942748395872387098595c63acf0c28d30f846fb749285c398d63595a6e3362097e8d7870c13ee7fcfae4f1e8fbdded73e5afb31dc5cd3c9a409696f4439bb4040cf0c426a1d5411361745933485d020a42071d677e23f95a72bc9e6f88ea42cbe60883c8fdf477595a0595a83394cb2cf5d3d0aeb65688bb8b71a3eb';
 const DATABASE_ID = process.env.APPWRITE_DATABASE_ID || process.env.VITE_APPWRITE_DATABASE_ID || 'newsaxis-main';
 const BUCKET_ID = process.env.APPWRITE_BUCKET_ID || process.env.VITE_APPWRITE_BUCKET_ID || 'newsaxis-media';
+
+// If project ID was provided on CLI, persist it to .env.local
+if (cliProjectId) {
+  try {
+    const envLocalPath = path.resolve(__dirname, '../.env.local');
+    let content = fs.existsSync(envLocalPath) ? fs.readFileSync(envLocalPath, 'utf8') : '';
+    if (content.includes('VITE_APPWRITE_PROJECT_ID=')) {
+      content = content.replace(/VITE_APPWRITE_PROJECT_ID=.*/g, `VITE_APPWRITE_PROJECT_ID=${cliProjectId}`);
+    } else {
+      content += `\nVITE_APPWRITE_PROJECT_ID=${cliProjectId}\n`;
+    }
+    fs.writeFileSync(envLocalPath, content, 'utf8');
+    console.log(`Saved VITE_APPWRITE_PROJECT_ID=${cliProjectId} to .env.local.`);
+  } catch (err) {
+    // Ignore error
+  }
+}
 
 console.log('\n========================================================');
 console.log('       NEWSAXIS APPWRITE DATABASE & STORAGE SETUP       ');
 console.log('========================================================\n');
 
-if (!PROJECT_ID || !API_KEY) {
-  console.error('❌ Error: Missing Appwrite Credentials!');
-  console.log('\nPlease make sure your .env.local or environment has:');
-  console.log('  VITE_APPWRITE_PROJECT_ID=your_project_id');
-  console.log('  APPWRITE_API_KEY=your_secret_api_key (created in Appwrite Console > API Keys)');
-  console.log('  VITE_APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1 (or self-hosted)\n');
+if (!PROJECT_ID) {
+  console.log('ℹ️ Usage: node scripts/setup-appwrite.js <YOUR_APPWRITE_PROJECT_ID>');
+  console.log('   Example: node scripts/setup-appwrite.js 672e819b001a4bc2014d\n');
+  console.log('You can find your Project ID in the Appwrite Console under Project Settings.\n');
   process.exit(1);
 }
 

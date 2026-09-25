@@ -179,6 +179,79 @@ class ArticleService {
   }
 
   /**
+   * Search Articles: queries server first, falls back to memory search with multi-token relevance scoring
+   */
+  async searchArticles(query = '', { category = 'all', type = 'all' } = {}) {
+    if (!query || !query.trim()) return [];
+
+    // 1. Try server search
+    try {
+      const url = new URL('/api/news', window.location.origin);
+      url.searchParams.set('search', query.trim());
+      if (category && category !== 'all') url.searchParams.set('category', category);
+      if (type && type !== 'all') url.searchParams.set('type', type);
+
+      const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.articles)) {
+          return data.articles;
+        }
+      }
+    } catch {
+      // Backend unavailable, fallback to local memory search
+    }
+
+    // 2. Client-side memory fallback with relevance scoring
+    const feed = await this.getHomeFeed();
+    const q = query.trim().toLowerCase();
+    const tokens = q.split(/\s+/).filter(t => t.length > 1);
+
+    const scored = feed.all.map(a => {
+      let score = 0;
+      const titleLower = (a.title || '').toLowerCase();
+      const summaryLower = (a.summary || '').toLowerCase();
+      const contentLower = (a.content || '').toLowerCase();
+      const authorLower = (a.authorName || '').toLowerCase();
+      const sourceLower = (a.sourceName || '').toLowerCase();
+      const catLower = (a.categoryId || a.categorySlug || '').toLowerCase();
+      const tagsLower = Array.isArray(a.tags) ? a.tags.join(' ').toLowerCase() : '';
+
+      if (titleLower === q) score += 200;
+      else if (titleLower.includes(q)) score += 100;
+
+      if (summaryLower.includes(q)) score += 50;
+      if (catLower === q || tagsLower.includes(q)) score += 40;
+      if (sourceLower.includes(q) || authorLower.includes(q)) score += 30;
+
+      for (const token of tokens) {
+        if (titleLower.includes(token)) score += 25;
+        if (summaryLower.includes(token)) score += 15;
+        if (catLower.includes(token) || tagsLower.includes(token)) score += 10;
+        if (contentLower.includes(token)) score += 5;
+      }
+
+      return { article: a, score };
+    });
+
+    let results = scored
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score || new Date(b.article.publishedAt) - new Date(a.article.publishedAt))
+      .map(item => item.article);
+
+    if (category && category !== 'all') {
+      results = results.filter(a => a.categoryId === category || a.categorySlug === category);
+    }
+    if (type === 'blogs') {
+      results = results.filter(a => a.contentType === 'blog' || a.sourceType.includes('blog'));
+    } else if (type === 'news') {
+      results = results.filter(a => a.contentType === 'news' || a.sourceType.includes('news'));
+    }
+
+    return results;
+  }
+
+  /**
    * Fetches nearby news & community blogs based on user geolocation
    */
   async getNearbyFeed(location = {}) {

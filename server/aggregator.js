@@ -73,6 +73,48 @@ const FEEDS = [
     url: 'https://www.wired.com/feed/rss',
     category: 'technology',
     type: 'news'
+  },
+  {
+    id: 'bbc_sport',
+    name: 'BBC Sport',
+    url: 'https://feeds.bbci.co.uk/sport/rss.xml',
+    category: 'sports',
+    type: 'news'
+  },
+  {
+    id: 'espn_news',
+    name: 'ESPN Sports',
+    url: 'https://www.espn.com/espn/rss/news',
+    category: 'sports',
+    type: 'news'
+  },
+  {
+    id: 'the_hindu_sport',
+    name: 'The Hindu Sport',
+    url: 'https://www.thehindu.com/sport/feeder/default.rss',
+    category: 'sports',
+    type: 'news'
+  },
+  {
+    id: 'google_news_sports',
+    name: 'Google News Sports',
+    url: 'https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRFp1ZEdvU0FtVnVHZ0pWVXlnQVAB?hl=en-US&gl=US&ceid=US%3Aen',
+    category: 'sports',
+    type: 'news'
+  },
+  {
+    id: 'bbc_entertainment',
+    name: 'BBC Entertainment & Arts',
+    url: 'https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml',
+    category: 'entertainment',
+    type: 'news'
+  },
+  {
+    id: 'google_news_india',
+    name: 'Google News India',
+    url: 'https://news.google.com/rss/headlines/section/geo/India?hl=en-IN&gl=IN&ceid=IN:en',
+    category: 'india',
+    type: 'news'
   }
 ];
 
@@ -108,6 +150,45 @@ function crc32(str) {
     crc = (crc >>> 8) ^ ((crc ^ str.charCodeAt(i)) & 0xFF);
   }
   return (crc ^ (-1)) >>> 0;
+}
+
+/**
+ * Intelligent Keyword-Based Category Resolver
+ * Ensures every incoming news item or dev blog is mapped strictly to its relevant beat
+ */
+export function inferCategory(title = '', description = '', defaultCat = 'world') {
+  const text = `${title} ${description}`.toLowerCase();
+  
+  // Sports indicators (Cricket, Football, Tennis, F1, Olympics, etc.)
+  if (/\b(cricket|football|soccer|tennis|fifa|ipl|bcci|icc|test match|odi|t20|wimbledon|olympics|nba|nfl|premier league|champions league|formula 1|f1|racing|messi|ronaldo|kohli|rohit sharma|wicket|goal|grand slam|athletics|badminton|kabaddi|chelsea|arsenal|liverpool|real madrid|barcelona|manchester united|manchester city|bundesliga|serie a|la liga)\b/i.test(text)) {
+    return 'sports';
+  }
+  // Technology & AI indicators
+  if (/\b(ai|artificial intelligence|machine learning|openai|chatgpt|deep learning|llm|nvidia|semiconductor|microchip|robotics|cybersecurity|android|ios|iphone|smartphone|software engineer|github|cloud computing|tech|gadgets)\b/i.test(text)) {
+    return 'technology';
+  }
+  // Programming & Dev Blog indicators
+  if (/\b(javascript|typescript|python|rust|golang|react|vue|angular|docker|kubernetes|web development|frontend|backend|api|database|sql|devops|css|html|compiler|git)\b/i.test(text)) {
+    return 'programming';
+  }
+  // Business, Economy & Finance indicators
+  if (/\b(stock market|stocks|shares|sensex|nifty|wall street|nasdaq|dow jones|s&p 500|inflation|gdp|recession|central bank|federal reserve|rbi|treasury|interest rate|earnings|revenue|quarterly profit|merger|ipo|cryptocurrency|bitcoin|ethereum|forex)\b/i.test(text)) {
+    return 'business';
+  }
+  // Science & Space exploration
+  if (/\b(nasa|isro|space|galaxy|black hole|astronomy|planet|telescope|james webb|mars|moon mission|quantum|physics|fossil|species|dna|genetics|biotechnology|solar system)\b/i.test(text)) {
+    return 'science';
+  }
+  // Entertainment & Cinema
+  if (/\b(movie|film|cinema|box office|actor|actress|hollywood|bollywood|trailer|soundtrack|grammy|oscar|emmy|netflix|streaming series|celebrity)\b/i.test(text)) {
+    return 'entertainment';
+  }
+  // India specific
+  if (/\b(india|indian|new delhi|mumbai|chennai|bengaluru|kolkata|hyderabad|tamil nadu|kerala|karnataka|bjp|congress|lok sabha|rajya sabha|supreme court of india|modi)\b/i.test(text)) {
+    if (defaultCat === 'world' || defaultCat === 'general') return 'india';
+  }
+
+  return defaultCat || 'world';
 }
 
 // Simple XML parser extracting <item> tags
@@ -523,13 +604,14 @@ export async function aggregateRealWorldContent(retentionMinutes = 30) {
       sourceName: item.feedName,
       sourceUrl: item.link,
       authorName: item.author,
-      categoryId: item.category,
-      tags: [item.category, item.type, item.feedName.toLowerCase()],
+      categoryId: inferCategory(item.title, item.description, item.category),
+      categorySlug: inferCategory(item.title, item.description, item.category),
+      tags: [inferCategory(item.title, item.description, item.category), item.type, item.feedName.toLowerCase()],
       publishedAt: item.pubDate,
       createdAt: new Date().toISOString(),
       expiresAt, // Strictly 30 minutes from ingestion
       batchId,
-      isBreaking: item.category === 'world' || item.category === 'india',
+      isBreaking: item.category === 'world' || item.category === 'india' || item.title.toLowerCase().includes('breaking'),
       isFeatured: false,
       views: item.reactions || Math.floor(Math.random() * 50) + 10,
       readingTime
