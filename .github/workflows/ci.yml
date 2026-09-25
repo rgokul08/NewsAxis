@@ -28,13 +28,14 @@ jobs:
       - name: Build Production Assets with GitHub Secrets
         run: npm run build
         env:
-          VITE_APPWRITE_ENDPOINT: ${{ secrets.VITE_APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1' }}
-          VITE_APPWRITE_PROJECT_ID: ${{ secrets.VITE_APPWRITE_PROJECT_ID || 'newsaxis-prod' }}
-          VITE_APPWRITE_DATABASE_ID: ${{ secrets.VITE_APPWRITE_DATABASE_ID || 'newsaxis-main' }}
-          VITE_APPWRITE_BUCKET_ID: ${{ secrets.VITE_APPWRITE_BUCKET_ID || 'newsaxis-media' }}
+          VITE_APPWRITE_ENDPOINT: ${{ secrets.VITE_APPWRITE_ENDPOINT }}
+          VITE_APPWRITE_PROJECT_ID: ${{ secrets.VITE_APPWRITE_PROJECT_ID }}
+          VITE_APPWRITE_DATABASE_ID: ${{ secrets.VITE_APPWRITE_DATABASE_ID }}
+          VITE_APPWRITE_BUCKET_ID: ${{ secrets.VITE_APPWRITE_BUCKET_ID }}
           VITE_GNEWS_API_KEY: ${{ secrets.VITE_GNEWS_API_KEY }}
           VITE_NEWSDATA_API_KEY: ${{ secrets.VITE_NEWSDATA_API_KEY }}
           VITE_NEWSAPI_KEY: ${{ secrets.VITE_NEWSAPI_KEY }}
           VITE_MEDIASTACK_API_KEY: ${{ secrets.VITE_MEDIASTACK_API_KEY }}
           VITE_THENEWSAPI_KEY: ${{ secrets.VITE_THENEWSAPI_KEY }}
           VITE_USE_DEMO_DATA: ${{ secrets.VITE_USE_DEMO_DATA || 'false' }}
+          
