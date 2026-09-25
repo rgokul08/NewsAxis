@@ -8,6 +8,8 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useGeolocation } from '../../hooks/useGeolocation';
+import { SyncRadarBar } from './SyncRadarBar';
+import { LiveNewsModal, LiveNewsLauncherButton } from '../live/LiveNewsPlayer';
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -19,6 +21,7 @@ export function Header() {
   const [searchQuery, setSearchQuery] = useState('');
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [locationPickerOpen, setLocationPickerOpen] = useState(false);
+  const [liveStreamOpen, setLiveStreamOpen] = useState(false);
   const navigate = useNavigate();
 
   const handleSearchSubmit = (e) => {
@@ -50,6 +53,9 @@ export function Header() {
   return (
     <header className="w-full bg-white dark:bg-[#0d1117] border-b border-[#e5e7eb] dark:border-[#30363d] transition-colors shadow-xs">
       
+      {/* 0. LIVE 30-MIN DATABASE SYNC RADAR */}
+      <SyncRadarBar />
+
       {/* 1. THE HINDU STYLE MASTHEAD ROW */}
       <div className="max-w-[1280px] mx-auto px-4 py-3 sm:py-4">
         <div className="grid grid-cols-12 items-center gap-2">
@@ -201,6 +207,9 @@ export function Header() {
                 {isDark ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5" />}
               </button>
 
+              {/* Free 24/7 Live News Stream Launcher */}
+              <LiveNewsLauncherButton onOpen={() => setLiveStreamOpen(true)} />
+
               {/* Crimson Subscribe Button */}
               <Link
                 to="/signup"
@@ -238,35 +247,42 @@ export function Header() {
             </button>
           </div>
 
-          {/* Center Category Links (Matching image.png order: India, World, Sport, etc.) */}
-          <div className="flex items-center gap-5 sm:gap-6 lg:gap-7 overflow-x-auto scrollbar-none whitespace-nowrap text-[13px] sm:text-[14px]">
+          {/* Center Category Links */}
+          <div className="flex items-center gap-5 sm:gap-6 lg:gap-7 overflow-x-auto scrollbar-none whitespace-nowrap text-[13px] sm:text-[14px] font-medium">
             <Link to="/category/india" className="text-[#111827] dark:text-[#f0f6fc] hover:text-[#a91b0d] dark:hover:text-rose-400 transition-colors">
               India
             </Link>
             <Link to="/category/world" className="text-[#111827] dark:text-[#f0f6fc] hover:text-[#a91b0d] dark:hover:text-rose-400 transition-colors">
               World
             </Link>
-            <Link to="/category/sports" className="text-[#111827] dark:text-[#f0f6fc] hover:text-[#a91b0d] dark:hover:text-rose-400 transition-colors">
-              Sport
+            <Link to="/category/technology" className="text-[#111827] dark:text-[#f0f6fc] hover:text-[#a91b0d] dark:hover:text-rose-400 transition-colors font-semibold">
+              Tech & AI
             </Link>
-            <Link to="/trending" className="text-[#111827] dark:text-[#f0f6fc] hover:text-[#a91b0d] dark:hover:text-rose-400 transition-colors">
-              Asian Games
+            {/* Free Real-World Live News Stream Link */}
+            <button
+              type="button"
+              onClick={() => setLiveStreamOpen(true)}
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-600/10 text-red-600 dark:text-red-400 dark:bg-red-950/40 hover:bg-red-600 hover:text-white transition-all cursor-pointer font-bold text-xs"
+              title="Watch 24/7 Free Live World News"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-ping" />
+              <span>LIVE TV</span>
+            </button>
+            <Link to="/blogs" className="text-emerald-700 dark:text-emerald-400 hover:underline transition-colors flex items-center gap-1 font-bold">
+              <span>Dev Blogs</span>
+              <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950 px-1 py-0.2 rounded text-emerald-800 dark:text-emerald-300">LIVE</span>
             </Link>
-            <Link to="/sources" className="text-[#111827] dark:text-[#f0f6fc] hover:text-[#a91b0d] dark:hover:text-rose-400 transition-colors">
-              Data
-            </Link>
-            <Link to="/category/science" className="text-[#111827] dark:text-[#f0f6fc] hover:text-[#a91b0d] dark:hover:text-rose-400 transition-colors">
-              Health
-            </Link>
-            <Link to="/category/opinion" className="text-[#111827] dark:text-[#f0f6fc] hover:text-[#a91b0d] dark:hover:text-rose-400 transition-colors">
-              Opinion
+            <Link to="/category/business" className="text-[#111827] dark:text-[#f0f6fc] hover:text-[#a91b0d] dark:hover:text-rose-400 transition-colors">
+              Business
             </Link>
             <Link to="/category/science" className="text-[#111827] dark:text-[#f0f6fc] hover:text-[#a91b0d] dark:hover:text-rose-400 transition-colors">
               Science
             </Link>
-            <Link to="/blogs" className="text-[#a91b0d] dark:text-rose-400 hover:underline transition-colors flex items-center gap-1 font-bold">
-              <span>Premium</span>
-              <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+            <Link to="/category/sports" className="text-[#111827] dark:text-[#f0f6fc] hover:text-[#a91b0d] dark:hover:text-rose-400 transition-colors">
+              Sport
+            </Link>
+            <Link to="/trending" className="text-[#111827] dark:text-[#f0f6fc] hover:text-[#a91b0d] dark:hover:text-rose-400 transition-colors">
+              Trending
             </Link>
           </div>
 
@@ -330,13 +346,27 @@ export function Header() {
             <Link to="/category/business" onClick={() => setMobileMenuOpen(false)} className="py-1">Business</Link>
             <Link to="/category/technology" onClick={() => setMobileMenuOpen(false)} className="py-1">Technology & AI</Link>
             <Link to="/category/tamil-nadu" onClick={() => setMobileMenuOpen(false)} className="py-1">Tamil Nadu / South</Link>
-            <Link to="/blogs" onClick={() => setMobileMenuOpen(false)} className="py-1 text-[#a91b0d]">Community Blogs (72h)</Link>
+            <button 
+              type="button"
+              onClick={() => { setMobileMenuOpen(false); setLiveStreamOpen(true); }}
+              className="py-1 text-left text-red-600 font-bold flex items-center gap-1.5"
+            >
+              <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
+              <span>Watch Live TV Broadcast</span>
+            </button>
+            <Link to="/blogs" onClick={() => setMobileMenuOpen(false)} className="py-1 text-slate-800 dark:text-slate-200">Community Blogs (1-Day)</Link>
             <Link to="/latest" onClick={() => setMobileMenuOpen(false)} className="py-1">Latest Dispatches</Link>
             <Link to="/trending" onClick={() => setMobileMenuOpen(false)} className="py-1">Trending Stories</Link>
-            <Link to="/write" onClick={() => setMobileMenuOpen(false)} className="py-1 text-[#a91b0d] font-bold">Write Story</Link>
+            <Link to="/write" onClick={() => setMobileMenuOpen(false)} className="py-1 text-[#a91b0d] font-bold">Write Story (24h Retention)</Link>
           </div>
         </div>
       )}
+
+      {/* Free 24/7 Verified Live News Broadcast Player Modal */}
+      <LiveNewsModal 
+        isOpen={liveStreamOpen} 
+        onClose={() => setLiveStreamOpen(false)} 
+      />
     </header>
   );
 }

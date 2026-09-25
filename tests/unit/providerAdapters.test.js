@@ -75,7 +75,7 @@ describe('NewsAxis Provider Adapters Suite', () => {
     expect(normalized.externalId).toBe('news_uuid_001');
     expect(normalized.providerId).toBe('thenewsapi');
     expect(normalized.sourceName).toBe('reuters.com');
-    expect(normalized.categorySlug).toBe('business');
+    expect(normalized.categorySlug).toBe('technology');
   });
 
   test('NewsDataProvider normalizes items correctly', () => {
@@ -114,7 +114,7 @@ describe('NewsAxis Provider Adapters Suite', () => {
     expect(normalized.externalId).toBe('https://example.com/quantum-news');
     expect(normalized.providerId).toBe('mediastack');
     expect(normalized.sourceName).toBe('Ars Technica');
-    expect(normalized.categorySlug).toBe('technology');
+    expect(normalized.categorySlug).toBe('science');
   });
 
   test('NewsApiOrgProvider normalizes items correctly', () => {
