@@ -52,13 +52,13 @@ export function WriteStoryPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-10">
-      {/* 72-Hour Expiration Warning Banner */}
+      {/* 1-Day (24-Hour) Expiration Banner */}
       <div className="mb-8 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 flex items-start gap-3">
         <Clock className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
         <div className="text-xs space-y-1">
-          <p className="font-bold text-sm">Mandatory 72-Hour Community Retention Policy</p>
+          <p className="font-bold text-sm">1-Day Community Retention Policy (24 Hours)</p>
           <p>
-            All community-published blogs and news reports on NewsAxis are strictly retained for a maximum of <strong>72 hours</strong>, after which all post records, reactions, and media are automatically scrubbed by our automated lifecycle jobs.
+            All user-uploaded community news and blogs are saved directly to our database and Appwrite storage. To keep content fresh, posts automatically delete after <strong>1 day (24 hours)</strong>.
           </p>
         </div>
       </div>
@@ -178,7 +178,7 @@ export function WriteStoryPage() {
               Word count: {content.trim().split(/\s+/).filter(Boolean).length}
             </span>
             <Button type="submit" variant="primary" size="md" loading={loading} icon={Send}>
-              Publish with 72h Retention
+              Publish to Database (1-Day Lifecycle)
             </Button>
           </div>
         </form>

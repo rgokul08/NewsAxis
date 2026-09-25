@@ -52,20 +52,26 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     if (isConfigured) {
+      try {
+        // Clear any lingering session before creating a new one to avoid 401/409 session conflicts
+        await account.deleteSession('current').catch(() => null);
+      } catch (e) {
+        // Ignore session clearing errors
+      }
       await account.createEmailPasswordSession(email, password);
       const acc = await account.get();
       const u = {
         id: acc.$id,
         email: acc.email,
-        name: acc.name,
-        username: acc.name.toLowerCase().replace(/\s+/g, ''),
+        name: acc.name || email.split('@')[0],
+        username: (acc.name || email.split('@')[0]).toLowerCase().replace(/\s+/g, ''),
         role: USER_ROLES.AUTHOR
       };
       setUser(u);
       localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(u));
       return u;
     } else {
-      // Local session
+      // Local session for development & testing
       const u = {
         id: `usr_${Date.now()}`,
         email,
@@ -97,6 +103,20 @@ export function AuthProvider({ children }) {
       localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(u));
       return u;
     }
+  };
+
+  const quickDemoLogin = (role = 'author') => {
+    const u = {
+      id: `usr_${Date.now()}`,
+      email: role === 'admin' ? 'director@newsaxis.media' : 'contributor@newsaxis.media',
+      name: role === 'admin' ? 'Editorial Director' : 'Staff Writer',
+      username: role === 'admin' ? 'director' : 'staff_writer',
+      role: role === 'admin' ? USER_ROLES.ADMIN : USER_ROLES.AUTHOR,
+      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'
+    };
+    setUser(u);
+    localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(u));
+    return u;
   };
 
   const fallbackGoogleLogin = () => {
@@ -151,7 +171,18 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, loginWithGoogle, logout, switchRole, isAuthenticated: Boolean(user) }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      loading, 
+      login, 
+      signup, 
+      loginWithGoogle, 
+      quickDemoLogin, 
+      logout, 
+      switchRole, 
+      isAuthenticated: Boolean(user),
+      isAppwriteConfigured: isConfigured
+    }}>
       {children}
     </AuthContext.Provider>
   );

@@ -120,15 +120,16 @@ export function ArticlePage() {
     );
   }
 
-  // 72h community expiration display
-  const isCommunity = article.sourceType?.startsWith('community');
+  // 30-Minute Cycle Expiration Display
   let expirationString = null;
-  if (isCommunity && article.expiresAt) {
+  if (article.expiresAt) {
     const msLeft = new Date(article.expiresAt).getTime() - Date.now();
     if (msLeft > 0) {
-      const h = Math.floor(msLeft / (1000 * 60 * 60));
-      const m = Math.floor((msLeft % (1000 * 60 * 60)) / (1000 * 60));
-      expirationString = `${h} hours ${m} minutes`;
+      const m = Math.floor(msLeft / (1000 * 60));
+      const s = Math.floor((msLeft % (1000 * 60)) / 1000);
+      expirationString = `${m} minutes ${s} seconds`;
+    } else {
+      expirationString = 'Purging in next cycle';
     }
   }
 
@@ -143,10 +144,17 @@ export function ArticlePage() {
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           <span className="px-2.5 py-1 rounded text-xs font-bold uppercase tracking-wider bg-sky-100 text-sky-800 dark:bg-sky-900/60 dark:text-sky-300">
-            {article.categorySlug}
+            {article.categorySlug || article.categoryId || 'NEWS'}
           </span>
           {article.isBreaking && <Badge variant="breaking">Breaking News</Badge>}
-          {isCommunity && <Badge variant="community">Community Story • 72h Retention</Badge>}
+          {article.sourceType === 'external_blog' && (
+            <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-xs font-bold px-2 py-0.5 rounded">
+              Tech Blog
+            </span>
+          )}
+          <span className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 text-xs font-bold font-mono px-2 py-0.5 rounded">
+            30-Min Cycle
+          </span>
         </div>
 
         <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 dark:text-white leading-tight">
@@ -159,11 +167,14 @@ export function ArticlePage() {
           </p>
         )}
 
-        {/* Expiration Banner for community posts */}
+        {/* 30-Min Expiration Banner */}
         {expirationString && (
           <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-xs text-amber-700 dark:text-amber-300 flex items-center justify-between">
-            <span>Community Retention: This story automatically deletes in <strong>{expirationString}</strong>.</span>
-            <Link to="/community-guidelines" className="underline font-bold">Policy</Link>
+            <span className="flex items-center gap-1.5 font-medium">
+              <Clock className="w-3.5 h-3.5 text-amber-600" />
+              <span>30-Minute Lifecycle: This article auto-purges from the database server in <strong>{expirationString}</strong> when new real-world updates arrive.</span>
+            </span>
+            <Link to="/" className="underline font-bold text-amber-800 dark:text-amber-200">Live Wire</Link>
           </div>
         )}
 

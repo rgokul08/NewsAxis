@@ -2,10 +2,10 @@ import { Client, Databases, Query, Storage } from 'node-appwrite';
 
 /**
  * Appwrite Scheduled Function: cleanup-expired-content
- * Schedule: every 15 minutes (or as configured)
+ * Schedule: every 30 minutes
  *
- * Mandatory 72-Hour Retention Enforcement:
- * 1. Finds all community posts where expiresAt <= now
+ * Mandatory 30-Minute Retention Enforcement:
+ * 1. Finds all posts where expiresAt <= now
  * 2. Deletes associated comments
  * 3. Deletes associated reactions
  * 4. Deletes associated media assets
@@ -39,11 +39,10 @@ export default async ({ req, res, log, error }) => {
   try {
     // 1. Query articles where expiresAt <= now
     const expiredList = await databases.listDocuments(databaseId, 'articles', [
-      Query.lessThanEqual('expiresAt', nowIso),
-      Query.equal('sourceType', ['community_blog', 'community_report'])
+      Query.lessThanEqual('expiresAt', nowIso)
     ]);
 
-    log(`Found ${expiredList.total} expired community articles to prune.`);
+    log(`Found ${expiredList.total} expired articles to prune (30-minute retention window).`);
 
     for (const article of expiredList.documents) {
       try {

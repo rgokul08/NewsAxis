@@ -9,11 +9,18 @@ export const APP_CONFIG = {
   baseUrl: typeof window !== 'undefined' ? window.location.origin : 'https://newsaxis.vercel.app',
   apiTimeout: 12000,
   
-  // Mandatory 72-Hour Retention for Community User Content
-  USER_POST_RETENTION_HOURS: 72,
+  // Retention Policies:
+  // 1. Real-World News: 30-Minute Cycle (Refetched & Purged every 30 minutes)
+  // 2. User-Uploaded News & Blogs: 24-Hour (1-Day) Expiration (Auto-deleted after 1 day)
+  NEWS_RETENTION_MINUTES: 30,
+  RETENTION_MINUTES: 30,
+  USER_POST_RETENTION_HOURS: 24, // User-uploaded content automatically deletes after 1 day
+  COMMUNITY_RETENTION_HOURS: 24,
+  SYNC_INTERVAL_MINUTES: 30,
+  SYNC_INTERVAL_MS: 30 * 60 * 1000,
   
-  // Default cache TTL for External Normalized News
-  EXTERNAL_CACHE_HOURS: 48,
+  // Default cache TTL for External Normalized News (30 mins)
+  EXTERNAL_CACHE_HOURS: 0.5,
   
   // Pagination limits
   DEFAULT_PAGE_SIZE: 12,
