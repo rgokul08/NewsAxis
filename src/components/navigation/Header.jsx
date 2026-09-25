@@ -8,7 +8,6 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useGeolocation } from '../../hooks/useGeolocation';
-import { SyncRadarBar } from './SyncRadarBar';
 import { LiveNewsModal, LiveNewsLauncherButton } from '../live/LiveNewsPlayer';
 
 export function Header() {
@@ -52,10 +51,6 @@ export function Header() {
 
   return (
     <header className="w-full bg-white dark:bg-[#0d1117] border-b border-[#e5e7eb] dark:border-[#30363d] transition-colors shadow-xs">
-      
-      {/* 0. LIVE 30-MIN DATABASE SYNC RADAR */}
-      <SyncRadarBar />
-
       {/* 1. THE HINDU STYLE MASTHEAD ROW */}
       <div className="max-w-[1280px] mx-auto px-4 py-3 sm:py-4">
         <div className="grid grid-cols-12 items-center gap-2">

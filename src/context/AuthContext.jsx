@@ -86,17 +86,22 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const signup = async (email, password, name) => {
+  const signup = async (email, password, name, role = USER_ROLES.READER) => {
     if (isConfigured) {
       await account.create('unique()', email, password, name);
-      return login(email, password);
+      const u = await login(email, password);
+      // Persist chosen role
+      const userWithRole = { ...u, role };
+      setUser(userWithRole);
+      localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(userWithRole));
+      return userWithRole;
     } else {
       const u = {
         id: `usr_${Date.now()}`,
         email,
         name,
         username: name.toLowerCase().replace(/\s+/g, ''),
-        role: USER_ROLES.AUTHOR,
+        role: role || USER_ROLES.READER,
         avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80'
       };
       setUser(u);
@@ -105,13 +110,21 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const updateUserRole = (newRole) => {
+    if (!user) return;
+    const updated = { ...user, role: newRole };
+    setUser(updated);
+    localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(updated));
+    return updated;
+  };
+
   const quickDemoLogin = (role = 'author') => {
     const u = {
       id: `usr_${Date.now()}`,
-      email: role === 'admin' ? 'director@newsaxis.media' : 'contributor@newsaxis.media',
-      name: role === 'admin' ? 'Editorial Director' : 'Staff Writer',
-      username: role === 'admin' ? 'director' : 'staff_writer',
-      role: role === 'admin' ? USER_ROLES.ADMIN : USER_ROLES.AUTHOR,
+      email: role === 'admin' ? 'director@newsaxis.media' : (role === 'author' ? 'contributor@newsaxis.media' : 'reader@newsaxis.media'),
+      name: role === 'admin' ? 'Editorial Director' : (role === 'author' ? 'Staff Writer' : 'Daily Reader'),
+      username: role === 'admin' ? 'director' : (role === 'author' ? 'staff_writer' : 'reader'),
+      role: role === 'admin' ? USER_ROLES.ADMIN : (role === 'author' ? USER_ROLES.AUTHOR : USER_ROLES.READER),
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'
     };
     setUser(u);

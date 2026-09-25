@@ -261,6 +261,7 @@ export function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [role, setRole] = useState('reader');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -289,7 +290,7 @@ export function SignupPage() {
     setLoading(true);
     setError(null);
     try {
-      await signup(email.trim(), password, name.trim());
+      await signup(email.trim(), password, name.trim(), role);
       navigate('/');
     } catch (err) {
       console.error('Registration error:', err);
@@ -444,6 +445,50 @@ export function SignupPage() {
                   placeholder="••••••••"
                   className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#a91b0d] transition-all"
                 />
+              </div>
+            </div>
+
+            {/* Reader vs Author Role Selector */}
+            <div className="pt-1">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                Select Your Role *
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setRole('reader')}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    role === 'reader'
+                      ? 'border-[#a91b0d] bg-red-50/50 dark:bg-red-950/20 ring-2 ring-[#a91b0d]'
+                      : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 opacity-70 hover:opacity-100'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-xs text-slate-900 dark:text-white">📖 Reader</span>
+                    {role === 'reader' && <span className="w-2 h-2 rounded-full bg-[#a91b0d]" />}
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                    Browse 30m real-world news, search, and bookmark stories.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setRole('author')}
+                  className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    role === 'author'
+                      ? 'border-[#a91b0d] bg-red-50/50 dark:bg-red-950/20 ring-2 ring-[#a91b0d]'
+                      : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 opacity-70 hover:opacity-100'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-bold text-xs text-slate-900 dark:text-white">✍️ Author</span>
+                    {role === 'author' && <span className="w-2 h-2 rounded-full bg-[#a91b0d]" />}
+                  </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">
+                    Write blogs, save local drafts, and publish 24-hr stories.
+                  </p>
+                </button>
               </div>
             </div>
 
