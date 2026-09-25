@@ -7,24 +7,44 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Attempt to load environment variables from .env.local or .env
+// Helper to parse .env file
+function loadEnvManual(filePath) {
+  if (fs.existsSync(filePath)) {
+    const lines = fs.readFileSync(filePath, 'utf8').split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx !== -1) {
+        const k = trimmed.slice(0, eqIdx).trim();
+        const v = trimmed.slice(eqIdx + 1).trim();
+        if (!process.env[k]) {
+          process.env[k] = v;
+        }
+      }
+    }
+  }
+}
+
 try {
   const envLocal = path.resolve(__dirname, '../.env.local');
   const envMain = path.resolve(__dirname, '../.env');
-  if (fs.existsSync(envLocal) && process.loadEnvFile) {
-    process.loadEnvFile(envLocal);
-  } else if (fs.existsSync(envMain) && process.loadEnvFile) {
-    process.loadEnvFile(envMain);
-  }
+  loadEnvManual(envLocal);
+  loadEnvManual(envMain);
 } catch (e) {
   // Continue
 }
 
 const cliProjectId = process.argv[2];
-const ENDPOINT = process.env.APPWRITE_ENDPOINT || process.env.VITE_APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1';
-const PROJECT_ID = cliProjectId || process.env.APPWRITE_PROJECT_ID || (process.env.VITE_APPWRITE_PROJECT_ID !== 'newsaxis-prod' ? process.env.VITE_APPWRITE_PROJECT_ID : null);
+let ENDPOINT = process.env.APPWRITE_ENDPOINT || process.env.VITE_APPWRITE_ENDPOINT || 'https://sgp.cloud.appwrite.io/v1';
+if (ENDPOINT === 'https://cloud.appwrite.io/v1') {
+  // Cloud Singapore regional endpoint for this project
+  ENDPOINT = 'https://sgp.cloud.appwrite.io/v1';
+}
+const PROJECT_ID = cliProjectId || process.env.APPWRITE_PROJECT_ID || process.env.VITE_APPWRITE_PROJECT_ID || '6a854c5d0026a9224d01';
 const API_KEY = process.env.APPWRITE_API_KEY || 'standard_8d908df942748395872387098595c63acf0c28d30f846fb749285c398d63595a6e3362097e8d7870c13ee7fcfae4f1e8fbdded73e5afb31dc5cd3c9a409696f4439bb4040cf0c426a1d5411361745933485d020a42071d677e23f95a72bc9e6f88ea42cbe60883c8fdf477595a0595a83394cb2cf5d3d0aeb65688bb8b71a3eb';
-const DATABASE_ID = process.env.APPWRITE_DATABASE_ID || process.env.VITE_APPWRITE_DATABASE_ID || 'newsaxis-main';
-const BUCKET_ID = process.env.APPWRITE_BUCKET_ID || process.env.VITE_APPWRITE_BUCKET_ID || 'newsaxis-media';
+const DATABASE_ID = process.env.APPWRITE_DATABASE_ID || process.env.VITE_APPWRITE_DATABASE_ID || '6ab613fc0006b9fedac1';
+const BUCKET_ID = process.env.APPWRITE_BUCKET_ID || process.env.VITE_APPWRITE_BUCKET_ID || '6ab614cc0022aa43fab8';
 
 // If project ID was provided on CLI, persist it to .env.local
 if (cliProjectId) {

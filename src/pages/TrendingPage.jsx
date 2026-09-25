@@ -36,7 +36,7 @@ export function TrendingPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
           {[1, 2, 3, 4, 5, 6].map(i => <div key={i} className="h-72 bg-slate-100 dark:bg-slate-800 rounded-xl" />)}
         </div>
-      ) : (
+      ) : articles.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {articles.map((story, i) => (
             <div key={story.id} className="relative">
@@ -46,6 +46,10 @@ export function TrendingPage() {
               <ArticleCard article={story} />
             </div>
           ))}
+        </div>
+      ) : (
+        <div className="text-center py-16 space-y-3">
+          <p className="text-slate-500">No trending stories in the active 30-minute radar.</p>
         </div>
       )}
     </div>

@@ -9,15 +9,31 @@ const CATEGORY_IMAGES = {
   technology: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&auto=format&fit=crop&q=80',
   programming: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=1200&auto=format&fit=crop&q=80',
   business: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&auto=format&fit=crop&q=80',
+  economy: 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1200&auto=format&fit=crop&q=80',
+  markets: 'https://images.unsplash.com/photo-1642543492481-44e81e3914a7?w=1200&auto=format&fit=crop&q=80',
+  trade: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=1200&auto=format&fit=crop&q=80',
+  politics: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=1200&auto=format&fit=crop&q=80',
+  startups: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200&auto=format&fit=crop&q=80',
   science: 'https://images.unsplash.com/photo-1507668077129-56e32842fceb?w=1200&auto=format&fit=crop&q=80',
   health: 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=1200&auto=format&fit=crop&q=80',
+  education: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=1200&auto=format&fit=crop&q=80',
   entertainment: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1200&auto=format&fit=crop&q=80',
   sports: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=1200&auto=format&fit=crop&q=80',
   india: 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=1200&auto=format&fit=crop&q=80',
+  lifestyle: 'https://images.unsplash.com/photo-1511988617509-a57c8a288659?w=1200&auto=format&fit=crop&q=80',
+  travel: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1200&auto=format&fit=crop&q=80',
+  environment: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&auto=format&fit=crop&q=80',
+  weather: 'https://images.unsplash.com/photo-1534088568595-a066f410bcda?w=1200&auto=format&fit=crop&q=80',
+  finance: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=1200&auto=format&fit=crop&q=80',
+  automobile: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=1200&auto=format&fit=crop&q=80',
+  agriculture: 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=1200&auto=format&fit=crop&q=80',
+  crime: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1200&auto=format&fit=crop&q=80',
+  opinion: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=1200&auto=format&fit=crop&q=80',
   default: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200&auto=format&fit=crop&q=80'
 };
 
 const FEEDS = [
+  // Global & World News
   {
     id: 'bbc_world',
     name: 'BBC News',
@@ -32,6 +48,7 @@ const FEEDS = [
     category: 'world',
     type: 'news'
   },
+  // India & National
   {
     id: 'the_hindu',
     name: 'The Hindu',
@@ -39,6 +56,44 @@ const FEEDS = [
     category: 'india',
     type: 'news'
   },
+  {
+    id: 'google_news_india',
+    name: 'Google News India',
+    url: 'https://news.google.com/rss/headlines/section/geo/India?hl=en-IN&gl=IN&ceid=IN:en',
+    category: 'india',
+    type: 'news'
+  },
+  // Politics
+  {
+    id: 'bbc_politics',
+    name: 'BBC Politics',
+    url: 'https://feeds.bbci.co.uk/news/politics/rss.xml',
+    category: 'politics',
+    type: 'news'
+  },
+  // Business, Economy & Markets
+  {
+    id: 'google_news_business',
+    name: 'Google Business News',
+    url: 'https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx6TVdZU0FtVnVHZ0pWVXlnQVAB?hl=en-US&gl=US&ceid=US%3Aen',
+    category: 'business',
+    type: 'news'
+  },
+  {
+    id: 'mint_economy',
+    name: 'Mint Economy & Policy',
+    url: 'https://www.livemint.com/rss/economy',
+    category: 'economy',
+    type: 'news'
+  },
+  {
+    id: 'cnbc_markets',
+    name: 'CNBC Global Markets',
+    url: 'https://search.cnbc.com/rs/search/view.html?partnerId=2000&keywords=markets&sort=date&type=rss',
+    category: 'markets',
+    type: 'news'
+  },
+  // Technology
   {
     id: 'techcrunch',
     name: 'TechCrunch',
@@ -54,12 +109,21 @@ const FEEDS = [
     type: 'news'
   },
   {
-    id: 'google_news_business',
-    name: 'Google Business News',
-    url: 'https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRGx6TVdZU0FtVnVHZ0pWVXlnQVAB?hl=en-US&gl=US&ceid=US%3Aen',
-    category: 'business',
+    id: 'wired_rss',
+    name: 'Wired',
+    url: 'https://www.wired.com/feed/rss',
+    category: 'technology',
     type: 'news'
   },
+  // Startups & Venture Capital
+  {
+    id: 'yourstory_feed',
+    name: 'YourStory Startups',
+    url: 'https://yourstory.com/feed',
+    category: 'startups',
+    type: 'news'
+  },
+  // Science & Environment
   {
     id: 'google_news_science',
     name: 'Google Science News',
@@ -68,12 +132,29 @@ const FEEDS = [
     type: 'news'
   },
   {
-    id: 'wired_rss',
-    name: 'Wired',
-    url: 'https://www.wired.com/feed/rss',
-    category: 'technology',
+    id: 'bbc_science_env',
+    name: 'BBC Science & Climate',
+    url: 'https://feeds.bbci.co.uk/news/science_and_environment/rss.xml',
+    category: 'environment',
     type: 'news'
   },
+  // Health
+  {
+    id: 'bbc_health',
+    name: 'BBC Health',
+    url: 'https://feeds.bbci.co.uk/news/health/rss.xml',
+    category: 'health',
+    type: 'news'
+  },
+  // Education
+  {
+    id: 'the_hindu_education',
+    name: 'The Hindu Education',
+    url: 'https://www.thehindu.com/education/feeder/default.rss',
+    category: 'education',
+    type: 'news'
+  },
+  // Sports
   {
     id: 'bbc_sport',
     name: 'BBC Sport',
@@ -102,6 +183,7 @@ const FEEDS = [
     category: 'sports',
     type: 'news'
   },
+  // Entertainment & Arts
   {
     id: 'bbc_entertainment',
     name: 'BBC Entertainment & Arts',
@@ -109,11 +191,28 @@ const FEEDS = [
     category: 'entertainment',
     type: 'news'
   },
+  // Automobile
   {
-    id: 'google_news_india',
-    name: 'Google News India',
-    url: 'https://news.google.com/rss/headlines/section/geo/India?hl=en-IN&gl=IN&ceid=IN:en',
-    category: 'india',
+    id: 'autocar_india',
+    name: 'Autocar Automotive',
+    url: 'https://www.autocarindia.com/rss/news',
+    category: 'automobile',
+    type: 'news'
+  },
+  // Agriculture
+  {
+    id: 'the_hindu_agri',
+    name: 'The Hindu Agriculture',
+    url: 'https://www.thehindu.com/sci-tech/agriculture/feeder/default.rss',
+    category: 'agriculture',
+    type: 'news'
+  },
+  // Opinion & Editorial
+  {
+    id: 'the_hindu_opinion',
+    name: 'The Hindu Opinion',
+    url: 'https://www.thehindu.com/opinion/feeder/default.rss',
+    category: 'opinion',
     type: 'news'
   }
 ];
@@ -154,28 +253,72 @@ function crc32(str) {
 
 /**
  * Intelligent Keyword-Based Category Resolver
- * Ensures every incoming news item or dev blog is mapped strictly to its relevant beat
+ * Maps incoming news stories and blogs strictly to their required beats
  */
 export function inferCategory(title = '', description = '', defaultCat = 'world') {
   const text = `${title} ${description}`.toLowerCase();
   
-  // Sports indicators (Cricket, Football, Tennis, F1, Olympics, etc.)
+  // Sports indicators
   if (/\b(cricket|football|soccer|tennis|fifa|ipl|bcci|icc|test match|odi|t20|wimbledon|olympics|nba|nfl|premier league|champions league|formula 1|f1|racing|messi|ronaldo|kohli|rohit sharma|wicket|goal|grand slam|athletics|badminton|kabaddi|chelsea|arsenal|liverpool|real madrid|barcelona|manchester united|manchester city|bundesliga|serie a|la liga)\b/i.test(text)) {
     return 'sports';
   }
-  // Technology & AI indicators
+  // Markets & Stock Market
+  if (/\b(stock market|stocks|sensex|nifty|wall street|nasdaq|dow jones|s&p 500|shares|equities|bull market|bear market|ipo|bse|nse|nyse|bond yields|forex)\b/i.test(text)) {
+    return 'markets';
+  }
+  // Economy & Trade
+  if (/\b(gdp|inflation|fiscal|monetary policy|recession|deficit|central bank|federal reserve|rbi|trade deficit|exports|imports|tariff|free trade|customs duty|wto)\b/i.test(text)) {
+    return text.includes('export') || text.includes('import') || text.includes('trade') ? 'trade' : 'economy';
+  }
+  // Finance & Banking
+  if (/\b(banking|bank|fintech|personal finance|cryptocurrency|bitcoin|ethereum|mutual fund|insurance|taxation|income tax|loan|credit card|interest rate)\b/i.test(text)) {
+    return 'finance';
+  }
+  // Politics & Governance
+  if (/\b(parliament|election|elections|bjp|congress|lok sabha|rajya sabha|prime minister|president|modi|rahul gandhi|democrat|republican|senate|congressional|cabinet|legislation|minister|diplomacy|summit)\b/i.test(text)) {
+    return 'politics';
+  }
+  // Crime, Courts & Judiciary
+  if (/\b(supreme court|high court|judiciary|verdict|bail|fir|police|arrest|arrested|cbi|ed|probe|murder|robbery|scam|fraud|investigation|prison|jail|accused|convicted|trial)\b/i.test(text)) {
+    return 'crime';
+  }
+  // Startups & Venture Capital
+  if (/\b(startup|startups|venture capital|vc|seed funding|series a|series b|angel investor|unicorn|founder|founding|pitch deck|y combinator|accelerator)\b/i.test(text)) {
+    return 'startups';
+  }
+  // Automobile
+  if (/\b(automobile|automotive|electric vehicle|ev|car|cars|suv|sedan|motorcycle|bike|tesla|tata motors|maruti|hyundai|toyota|mahindra|bmw|mercedes|engine|mileage|gearbox)\b/i.test(text)) {
+    return 'automobile';
+  }
+  // Agriculture & Farming
+  if (/\b(agriculture|farming|farmer|farmers|crop|crops|monsoon|kharif|rabi|msp|harvest|fertilizer|agritech|paddy|wheat|irrigation|soil)\b/i.test(text)) {
+    return 'agriculture';
+  }
+  // Health & Medicine
+  if (/\b(health|hospital|doctor|vaccine|virus|disease|cancer|mental health|cardiology|surgery|wellness|pharma|pharmaceutical|epidemic|pandemic|nutrition|clinical trial|who|fda)\b/i.test(text)) {
+    return 'health';
+  }
+  // Education & Academia
+  if (/\b(education|university|college|school|student|students|exam|cbse|icse|ugc|neet|jee|syllabus|admissions|curriculum|degree|campus|faculty)\b/i.test(text)) {
+    return 'education';
+  }
+  // Environment & Weather
+  if (/\b(climate change|global warming|carbon emissions|renewable energy|cyclone|rainfall|monsoon weather|heatwave|flood|drought|weather forecast|wildfire|ecology|pollution|air quality|aqi)\b/i.test(text)) {
+    return text.includes('weather') || text.includes('temperature') || text.includes('forecast') ? 'weather' : 'environment';
+  }
+  // Travel & Lifestyle
+  if (/\b(travel|tourism|tourist|hotel|flight|airline|destination|vacation|itinerary|resort|lifestyle|fashion|culture|cuisine|recipes)\b/i.test(text)) {
+    return text.includes('hotel') || text.includes('flight') || text.includes('travel') || text.includes('tourism') ? 'travel' : 'lifestyle';
+  }
+  // Technology & AI
   if (/\b(ai|artificial intelligence|machine learning|openai|chatgpt|deep learning|llm|nvidia|semiconductor|microchip|robotics|cybersecurity|android|ios|iphone|smartphone|software engineer|github|cloud computing|tech|gadgets)\b/i.test(text)) {
     return 'technology';
   }
-  // Programming & Dev Blog indicators
+  // Programming & Dev Blogs
   if (/\b(javascript|typescript|python|rust|golang|react|vue|angular|docker|kubernetes|web development|frontend|backend|api|database|sql|devops|css|html|compiler|git)\b/i.test(text)) {
     return 'programming';
   }
-  // Business, Economy & Finance indicators
-  if (/\b(stock market|stocks|shares|sensex|nifty|wall street|nasdaq|dow jones|s&p 500|inflation|gdp|recession|central bank|federal reserve|rbi|treasury|interest rate|earnings|revenue|quarterly profit|merger|ipo|cryptocurrency|bitcoin|ethereum|forex)\b/i.test(text)) {
-    return 'business';
-  }
-  // Science & Space exploration
+  // Science & Space
   if (/\b(nasa|isro|space|galaxy|black hole|astronomy|planet|telescope|james webb|mars|moon mission|quantum|physics|fossil|species|dna|genetics|biotechnology|solar system)\b/i.test(text)) {
     return 'science';
   }
@@ -183,8 +326,12 @@ export function inferCategory(title = '', description = '', defaultCat = 'world'
   if (/\b(movie|film|cinema|box office|actor|actress|hollywood|bollywood|trailer|soundtrack|grammy|oscar|emmy|netflix|streaming series|celebrity)\b/i.test(text)) {
     return 'entertainment';
   }
+  // Opinion & Editorial
+  if (/\b(opinion|editorial|column|commentary|analysis|perspective|viewpoint|op-ed)\b/i.test(text)) {
+    return 'opinion';
+  }
   // India specific
-  if (/\b(india|indian|new delhi|mumbai|chennai|bengaluru|kolkata|hyderabad|tamil nadu|kerala|karnataka|bjp|congress|lok sabha|rajya sabha|supreme court of india|modi)\b/i.test(text)) {
+  if (/\b(india|indian|new delhi|mumbai|chennai|bengaluru|kolkata|hyderabad|tamil nadu|kerala|karnataka)\b/i.test(text)) {
     if (defaultCat === 'world' || defaultCat === 'general') return 'india';
   }
 
@@ -590,25 +737,40 @@ export async function aggregateRealWorldContent(retentionMinutes = 30) {
     const words = `${item.title} ${item.description}`.split(/\s+/).length;
     const readingTime = item.readingTime || Math.max(2, Math.ceil(words / 60));
 
+    const inferredCat = inferCategory(item.title, item.description, item.category);
+
     deduplicated.push({
       id: articleId,
       externalId: item.link || articleId,
+      external_id: item.link || articleId,
       providerId: item.feedId,
       sourceType: item.type === 'blog' ? 'external_blog' : 'external_news',
       contentType: item.type || 'news',
       title: item.title,
       slug,
       summary: item.description,
+      description: item.description,
       content: item.content || item.description,
       imageUrl: item.imageUrl,
+      image_url: item.imageUrl,
+      thumbnail_url: item.imageUrl,
       sourceName: item.feedName,
+      source_name: item.feedName,
       sourceUrl: item.link,
+      source_url: item.link,
       authorName: item.author,
-      categoryId: inferCategory(item.title, item.description, item.category),
-      categorySlug: inferCategory(item.title, item.description, item.category),
-      tags: [inferCategory(item.title, item.description, item.category), item.type, item.feedName.toLowerCase()],
+      author: item.author,
+      categoryId: inferredCat,
+      categorySlug: inferredCat,
+      category: inferredCat,
+      sub_category: item.feedName,
+      language: 'en',
+      country: item.category === 'india' ? 'in' : 'global',
+      tags: [inferredCat, item.type, item.feedName.toLowerCase()],
       publishedAt: item.pubDate,
+      published_at: item.pubDate,
       createdAt: new Date().toISOString(),
+      fetched_at: new Date().toISOString(),
       expiresAt, // Strictly 30 minutes from ingestion
       batchId,
       isBreaking: item.category === 'world' || item.category === 'india' || item.title.toLowerCase().includes('breaking'),

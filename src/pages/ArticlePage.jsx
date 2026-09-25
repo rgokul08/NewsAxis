@@ -33,7 +33,7 @@ export function ArticlePage() {
         setCurrentReaction(articleService.getReaction(item.id));
         setReactions(item.reactions || { like: 12, helpful: 4, interesting: 7, insightful: 2 });
       } catch (err) {
-        setError(err.message === 'CONTENT_EXPIRED' ? 'This community post has expired after its 72-hour window and is no longer available.' : 'Article not found');
+        setError(err.message === 'CONTENT_EXPIRED' ? 'This post has reached its expiration window (30 minutes for real-time news, 24 hours for author blogs) and has been purged.' : 'Article not found');
       } finally {
         setLoading(false);
       }

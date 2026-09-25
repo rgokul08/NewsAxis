@@ -2,7 +2,6 @@ import { databases, isConfigured } from './appwriteClient';
 import { APP_CONFIG } from '../config/appConfig';
 import { normalizeArticle, deduplicateArticles, calculateTrendingScore } from '../utils/normalizeArticle';
 import { providerRegistry } from '../providers';
-import { SEED_ARTICLES } from '../constants/seedData';
 
 const LOCAL_STORAGE_ARTICLES_KEY = 'newsaxis_local_articles';
 const LOCAL_STORAGE_BOOKMARKS_KEY = 'newsaxis_local_bookmarks';
@@ -13,6 +12,7 @@ const LOCAL_STORAGE_SYNC_KEY = 'newsaxis_last_sync_time';
  * Core Article and Feed Service
  * Connects to the 30-minute Database Server (/api) when running,
  * and maintains resilient client-side storage, 30-minute auto-purge, and fallback aggregation.
+ * Strictly uses real-world data only (NO demo/mock data).
  */
 class ArticleService {
   constructor() {
@@ -22,19 +22,7 @@ class ArticleService {
   }
 
   initLocalStore() {
-    // Seed initial articles into memory with 30-min expiration if unexpired
-    const now = Date.now();
-    SEED_ARTICLES.forEach(art => {
-      const artWithExpiry = {
-        ...art,
-        expiresAt: art.expiresAt || new Date(now + (APP_CONFIG.RETENTION_MINUTES * 60 * 1000)).toISOString()
-      };
-      if (!this.isExpired(artWithExpiry)) {
-        this.memoryArticles.set(artWithExpiry.id, artWithExpiry);
-      }
-    });
-
-    // Load saved articles from local storage
+    // Only load real, unexpired articles from local storage (NO SEED FIXTURES)
     if (typeof window !== 'undefined') {
       try {
         const savedSync = localStorage.getItem(LOCAL_STORAGE_SYNC_KEY);
@@ -44,7 +32,7 @@ class ArticleService {
         if (saved) {
           const parsed = JSON.parse(saved);
           parsed.forEach(art => {
-            // Strictly enforce 30-minute expiration
+            // Strictly enforce 30-minute expiration for news, 24h for user posts
             if (this.isExpired(art)) return;
             this.memoryArticles.set(art.id, art);
           });
@@ -163,6 +151,24 @@ class ArticleService {
    * Fetches articles by category
    */
   async getByCategory(categorySlug, { page = 1, limit = 12 } = {}) {
+    try {
+      const res = await fetch(`/api/news/category/${encodeURIComponent(categorySlug)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.articles)) {
+          const start = (page - 1) * limit;
+          return {
+            items: data.articles.slice(start, start + limit),
+            total: data.articles.length,
+            page,
+            hasMore: start + limit < data.articles.length
+          };
+        }
+      }
+    } catch {
+      // Backend not running, use client fallback
+    }
+
     const feed = await this.getHomeFeed();
     const filtered = feed.all.filter(a => 
       a.categorySlug?.toLowerCase() === categorySlug.toLowerCase() || 
@@ -325,6 +331,10 @@ class ArticleService {
    * Enforces 1-Day (24-Hour) retention ceiling (auto-deleted after 1 day)
    */
   async createCommunityArticle(data, author) {
+    if (author?.role === 'reader') {
+      throw new Error('Readers are not authorized to publish stories. Please switch your account role to Author.');
+    }
+
     const now = new Date();
     // 1-Day (24 hours) retention for user uploaded news and blogs
     const retentionMs = (APP_CONFIG.USER_POST_RETENTION_HOURS || 24) * 60 * 60 * 1000;
@@ -333,11 +343,11 @@ class ArticleService {
     const normalized = normalizeArticle({
       ...data,
       id: `comm_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-      authorId: author?.id || author?.$id || 'guest_user',
-      authorName: author?.name || 'Community Contributor',
+      authorId: author?.id || author?.$id || 'author',
+      authorName: author?.name || 'Community Author',
       authorUrl: author?.username ? `/author/${author.username}` : '',
       sourceType: data.sourceType || 'community_blog',
-      sourceName: 'NewsAxis Community',
+      sourceName: author?.name ? `${author.name} (NewsAxis Author)` : 'Community Author',
       createdAt: now.toISOString(),
       publishedAt: now.toISOString(),
       expiresAt, // Strictly 1 day (24 hours) for user uploads
@@ -346,12 +356,16 @@ class ArticleService {
       uniqueViews: 1
     });
 
-    // Try sending to backend server
+    // Try sending to backend server with role authorization
     try {
-      await fetch('/api/articles', {
+      const userRole = author?.role || 'author';
+      await fetch('/api/blogs', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(normalized)
+        headers: { 
+          'Content-Type': 'application/json',
+          'X-User-Role': userRole
+        },
+        body: JSON.stringify({ ...normalized, userRole })
       });
     } catch {
       // server offline, persist locally

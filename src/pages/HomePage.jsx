@@ -138,14 +138,11 @@ export function HomePage() {
           </div>
 
           <div className="flex items-center gap-3 text-xs">
-            <span className="text-slate-500 dark:text-slate-400 font-medium normal-case flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5 text-amber-500" />
-              <span>Auto-purges & syncs every 30m</span>
-            </span>
             <button
               onClick={handleManualRefresh}
               disabled={refreshing}
               className="text-[#a91b0d] dark:text-rose-400 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+              title="Refresh latest news"
             >
               <RefreshCw className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} />
               <span>{refreshing ? 'Updating...' : 'Refresh'}</span>
@@ -256,6 +253,26 @@ export function HomePage() {
               ))}
             </div>
           </section>
+        ) : feed.all.length === 0 && !loading ? (
+          <div className="py-20 text-center space-y-4 max-w-lg mx-auto animate-in fade-in">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto">
+              <Clock className="w-8 h-8" />
+            </div>
+            <h2 className="font-serif text-2xl font-black text-slate-900 dark:text-white">
+              No Active News in Current 30-Minute Radar
+            </h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              The live news radar automatically fetches real-world news and purges items older than 30 minutes in IST. Click below to load fresh real news from the database server.
+            </p>
+            <button
+              onClick={handleManualRefresh}
+              disabled={refreshing}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#a91b0d] hover:bg-[#8e1509] text-white font-bold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <span>{refreshing ? 'Refreshing Live Radar...' : 'Fetch Live News Now'}</span>
+            </button>
+          </div>
         ) : (
           <>
             {/* 2. THE HINDU 3-COLUMN LEAD EDITORIAL GRID */}
