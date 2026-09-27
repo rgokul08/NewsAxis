@@ -5,6 +5,7 @@ import { TheNewsApiProvider } from './theNewsApiProvider';
 import { NewsDataProvider } from './newsDataProvider';
 import { MediaStackProvider } from './mediaStackProvider';
 import { NewsApiOrgProvider } from './newsApiOrgProvider';
+import { DevToProvider } from './devProvider';
 import { deduplicateArticles } from '../utils/normalizeArticle';
 
 /**
@@ -50,39 +51,8 @@ class ProviderRegistry {
     // 6. DEV.to API (Developer, Coding, Career)
     this.register(new DevToProvider());
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     // 7. Hashnode GraphQL API (Tech, AI, Software Engineering)
     this.register(new HashnodeProvider());
-
-
-
-
-
 
     // 8. Google News RSS - World
     this.register(new PublicFeedProvider({
@@ -118,13 +88,7 @@ class ProviderRegistry {
       feedUrl: 'https://feeds.bbci.co.uk/news/world/rss.xml',
       defaultCategory: 'world',
       priority: 2
-
-
-
-
     }));
-
-
 
     // 12. TechCrunch (Startups, Funding, AI)
     this.register(new PublicFeedProvider({
@@ -133,9 +97,6 @@ class ProviderRegistry {
       feedUrl: 'https://techcrunch.com/feed/',
       defaultCategory: 'startups',
       priority: 3
-
-
-
     }));
 
     // 13. Wired Science & Technology
@@ -147,8 +108,6 @@ class ProviderRegistry {
       priority: 3
     }));
 
-
-
     // 14. Medium RSS - Technology Stories
     this.register(new PublicFeedProvider({
       id: 'medium_tech',
@@ -156,36 +115,12 @@ class ProviderRegistry {
       feedUrl: 'https://medium.com/feed/tag/technology',
       defaultCategory: 'technology',
       priority: 4
-
-
-
-
-
-
     }));
-
-}
+  }
 
   register(provider) {
     this.providers.set(provider.id, provider);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}
+  }
 
   get(id) {
     return this.providers.get(id);
@@ -195,10 +130,8 @@ class ProviderRegistry {
     return Array.from(this.providers.values());
   }
 
-
   getEnabled() {
     return this.getAll().filter(p => p.enabled);
-
   }
 
   /**
@@ -213,7 +146,7 @@ class ProviderRegistry {
 
     const enabled = this.getEnabled();
     const fetchPromises = enabled.map(async p => {
-  try {
+      try {
         const res = await p.fetchLatest();
         return res.success ? res.items : [];
       } catch (err) {
@@ -221,48 +154,11 @@ class ProviderRegistry {
       }
     });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     const results = await Promise.allSettled(fetchPromises);
     let allArticles = [];
     for (const r of results) {
       if (r.status === 'fulfilled' && Array.isArray(r.value)) {
         allArticles.push(...r.value);
-
-
-
-
-
       }
     }
 
@@ -276,7 +172,7 @@ class ProviderRegistry {
     this.cache.set(cacheKey, { timestamp: Date.now(), data: cleanArticles });
 
     return cleanArticles;
-    }
+  }
 
   /**
    * Health checks for all providers
