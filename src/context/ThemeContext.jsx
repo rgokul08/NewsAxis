@@ -4,13 +4,14 @@ const ThemeContext = createContext(null);
 const THEME_KEY = 'newsaxis_theme';
 
 export function ThemeProvider({ children }) {
+  // Requirement: default theme is LIGHT. Only use a saved preference if the
+  // user has explicitly chosen one before; do NOT default to OS preference.
   const [theme, setTheme] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(THEME_KEY);
-      if (saved) return saved;
-      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      if (saved === 'dark' || saved === 'light') return saved;
     }
-    return 'dark';
+    return 'light';
   });
 
   useEffect(() => {
@@ -22,7 +23,6 @@ export function ThemeProvider({ children }) {
     }
     localStorage.setItem(THEME_KEY, theme);
 
-    // Dynamic Favicon switching for Light & Dark mode
     const faviconHref = theme === 'dark' ? '/dark(1).png' : '/light(1).png';
     let faviconLink = document.querySelector("link[rel~='icon']");
     if (!faviconLink) {
