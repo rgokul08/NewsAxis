@@ -19,23 +19,27 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     async function checkSession() {
-      if (isConfigured) {
-        try {
-          const currentAccount = await account.get();
-          const profile = await loadProfile(currentAccount.$id, currentAccount);
-          setUser(profile);
-        } catch {
-          setUser(null);
-        }
-      } else {
-        try {
+      // Never let a failed/misconfigured Appwrite call crash the app render —
+      // always fall back to "logged out" instead of throwing.
+      try {
+        if (isConfigured) {
+          try {
+            const currentAccount = await account.get();
+            const profile = await loadProfile(currentAccount.$id, currentAccount);
+            setUser(profile);
+          } catch {
+            setUser(null);
+          }
+        } else {
           const saved = localStorage.getItem(LOCAL_USER_KEY);
           if (saved) setUser(JSON.parse(saved));
-        } catch {
-          setUser(null);
         }
+      } catch (err) {
+        console.warn('Session check failed, continuing as logged out:', err?.message || err);
+        setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     checkSession();
   }, []);
@@ -45,7 +49,7 @@ export function AuthProvider({ children }) {
     try {
       profile = await databases.getDocument(
         APP_CONFIG.appwrite.databaseId,
-        PROFILES_COLLECTION,
+        PROFILES_COLLECTION || 'profiles',
         userId
       );
     } catch {
