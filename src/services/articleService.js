@@ -438,6 +438,20 @@ class ArticleService {
     };
   }
 
+async registerView(articleId) {
+  const art = this.memoryArticles.get(articleId);
+  if (art) {
+    art.views = (art.views || 0) + 1;
+    this.memoryArticles.set(articleId, art);
+    this.persistLocalArticles();
+  }
+ 
+  try {
+    await fetch(`/api/news/${articleId}/view`, { method: 'POST' });
+  } catch {
+    // Backend not running or route not implemented yet — silent no-op
+  }
+}
   /**
    * Manually trigger an immediate 30-min cycle refresh
    */
