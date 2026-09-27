@@ -1,480 +1,199 @@
+import { Query } from 'appwrite';
 import { databases, isConfigured } from './appwriteClient';
 import { APP_CONFIG } from '../config/appConfig';
-import { normalizeArticle, deduplicateArticles, calculateTrendingScore } from '../utils/normalizeArticle';
-import { providerRegistry } from '../providers';
+import { calculateTrendingScore } from '../utils/normalizeArticle';
 
-const LOCAL_STORAGE_ARTICLES_KEY = 'newsaxis_local_articles';
+const ARTICLES_COLLECTION = APP_CONFIG.appwrite.collections.articles;
 const LOCAL_STORAGE_BOOKMARKS_KEY = 'newsaxis_local_bookmarks';
 const LOCAL_STORAGE_REACTIONS_KEY = 'newsaxis_local_reactions';
-const LOCAL_STORAGE_SYNC_KEY = 'newsaxis_last_sync_time';
 
 /**
- * Core Article and Feed Service
- * Connects to the 30-minute Database Server (/api) when running,
- * and maintains resilient client-side storage, 30-minute auto-purge, and fallback aggregation.
- * Strictly uses real-world data only (NO demo/mock data).
+ * ArticleService — READS ONLY FROM APPWRITE.
+ *
+ * The site never calls external news/blog APIs directly. All external
+ * ingestion happens server-side (server/index.js or the Appwrite Function
+ * in appwrite/functions/sync-news) on a 30-minute IST schedule, which writes
+ * normalized, categorized, deduplicated articles into the Appwrite
+ * `articles` collection. This service only queries that collection.
  */
 class ArticleService {
-  constructor() {
-    this.memoryArticles = new Map();
-    this.lastSyncTime = Date.now();
-    this.initLocalStore();
+  mapDoc(doc) {
+    return {
+      id: doc.$id,
+      externalId: doc.externalId || doc.external_id || null,
+      providerId: doc.providerId,
+      sourceType: doc.sourceType,
+      contentType: doc.contentType,
+      title: doc.title,
+      slug: doc.slug,
+      summary: doc.summary,
+      content: doc.content,
+      imageUrl: doc.imageUrl,
+      sourceName: doc.sourceName,
+      sourceUrl: doc.sourceUrl,
+      authorName: doc.authorName,
+      categoryId: doc.categoryId,
+      categorySlug: doc.categoryId,
+      tags: (() => {
+        try { return JSON.parse(doc.tags || '[]'); } catch { return []; }
+      })(),
+      publishedAt: doc.publishedAt,
+      createdAt: doc.createdAt,
+      expiresAt: doc.expiresAt,
+      isBreaking: Boolean(doc.isBreaking),
+      isFeatured: Boolean(doc.isFeatured),
+      views: doc.views || 0,
+      readingTime: doc.readingTime || 3,
+      reactions: { like: 0, helpful: 0, interesting: 0, insightful: 0 }
+    };
   }
 
-  initLocalStore() {
-    // Only load real, unexpired articles from local storage (NO SEED FIXTURES)
-    if (typeof window !== 'undefined') {
-      try {
-        const savedSync = localStorage.getItem(LOCAL_STORAGE_SYNC_KEY);
-        if (savedSync) this.lastSyncTime = parseInt(savedSync, 10);
-
-        const saved = localStorage.getItem(LOCAL_STORAGE_ARTICLES_KEY);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          parsed.forEach(art => {
-            // Strictly enforce 30-minute expiration for news, 24h for user posts
-            if (this.isExpired(art)) return;
-            this.memoryArticles.set(art.id, art);
-          });
-        }
-      } catch (err) {
-        console.warn('Local storage article load skipped', err);
-      }
+  async listActive({ limit = 60, offset = 0, category = null, contentType = null } = {}) {
+    if (!isConfigured) {
+      return { items: [], total: 0 };
     }
+    const nowIso = new Date().toISOString();
+    const queries = [
+      Query.greaterThan('expiresAt', nowIso),
+      Query.orderDesc('publishedAt'),
+      Query.limit(limit),
+      Query.offset(offset)
+    ];
+    if (category) queries.push(Query.equal('categoryId', category));
+    if (contentType) queries.push(Query.equal('contentType', contentType));
+
+    const res = await databases.listDocuments(
+      APP_CONFIG.appwrite.databaseId,
+      ARTICLES_COLLECTION,
+      queries
+    );
+    return { items: res.documents.map(this.mapDoc), total: res.total };
   }
 
-  isExpired(article) {
-    if (!article.expiresAt) return false;
-    return new Date(article.expiresAt).getTime() <= Date.now();
-  }
+  async getHomeFeed({ limit = 100 } = {}) {
+    const { items: all } = await this.listActive({ limit });
 
-  persistLocalArticles() {
-    if (typeof window === 'undefined') return;
-    try {
-      const arr = Array.from(this.memoryArticles.values()).filter(a => !this.isExpired(a));
-      localStorage.setItem(LOCAL_STORAGE_ARTICLES_KEY, JSON.stringify(arr));
-      localStorage.setItem(LOCAL_STORAGE_SYNC_KEY, String(this.lastSyncTime));
-    } catch (e) {
-      console.warn('Failed to persist articles to localStorage', e);
-    }
-  }
-
-  /**
-   * Fetches home feed: queries database server first (/api/news),
-   * falls back to direct provider aggregation if backend is not running.
-   */
-  async getHomeFeed() {
-    // Clean up expired items prior to serving feed
-    this.cleanupExpired();
-
-    // 1. Try fetching from Backend Database Server
-    try {
-      const res = await fetch('/api/news', { headers: { 'Accept': 'application/json' } });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && Array.isArray(data.all) && data.all.length > 0) {
-          // Synchronize local memory with database server articles
-          data.all.forEach(art => {
-            if (!this.isExpired(art)) {
-              this.memoryArticles.set(art.id, art);
-            }
-          });
-          this.lastSyncTime = Date.now();
-          this.persistLocalArticles();
-
-          return {
-            breaking: data.breaking || [],
-            featured: data.featured || data.all[0] || null,
-            latest: data.latest || data.all.slice(0, 20),
-            trending: data.trending || [],
-            communityBlogs: data.communityBlogs || [],
-            all: data.all,
-            total: data.total,
-            isFromDatabaseServer: true
-          };
-        }
-      }
-    } catch (serverErr) {
-      // Backend not running; proceed with client fallback
-    }
-
-    // 2. Client-side Fallback Aggregation
-    let externalItems = [];
-    try {
-      externalItems = await providerRegistry.aggregateAll({ limit: 40 });
-      // Attach 30-min expiration
-      const now = Date.now();
-      const expiresAt = new Date(now + (APP_CONFIG.RETENTION_MINUTES * 60 * 1000)).toISOString();
-      externalItems = externalItems.map(item => ({
-        ...item,
-        expiresAt: item.expiresAt || expiresAt
-      }));
-    } catch (e) {
-      console.warn('Provider aggregation fallback', e);
-    }
-
-    // 3. Combine with memory/local/Appwrite articles
-    const internalArticles = Array.from(this.memoryArticles.values()).filter(a => !this.isExpired(a));
-    const combined = deduplicateArticles([...internalArticles, ...externalItems]);
-
-    // Save to memory
-    combined.forEach(art => this.memoryArticles.set(art.id, art));
-    this.persistLocalArticles();
-
-    // Partition sections
-    const breaking = combined.filter(a => a.isBreaking);
-    const featured = combined.find(a => a.isFeatured) || combined[0] || null;
-    const latest = [...combined].sort((a, b) => new Date(b.publishedAt || b.createdAt) - new Date(a.publishedAt || a.createdAt));
-    const trending = [...combined]
+    const breaking = all.filter(a => a.isBreaking).slice(0, 10);
+    const featured = all.find(a => a.isFeatured) || all[0] || null;
+    const latest = [...all].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)).slice(0, 20);
+    const trending = [...all]
       .map(a => ({ ...a, trendingScore: calculateTrendingScore(a) }))
       .sort((a, b) => b.trendingScore - a.trendingScore)
       .slice(0, 10);
-    const communityBlogs = combined.filter(a => 
-      a.contentType === 'blog' || 
-      a.sourceType === 'community_blog' || 
-      a.sourceType === 'external_blog'
+    const communityBlogs = all.filter(a =>
+      a.contentType === 'blog' || a.sourceType === 'community_blog' || a.sourceType === 'external_blog'
     );
 
-    return {
-      breaking,
-      featured,
-      latest: latest.slice(0, 20),
-      trending,
-      communityBlogs,
-      all: combined,
-      total: combined.length,
-      isFromDatabaseServer: false
-    };
+    return { breaking, featured, latest, trending, communityBlogs, all, total: all.length };
   }
 
-  /**
-   * Fetches articles by category
-   */
   async getByCategory(categorySlug, { page = 1, limit = 12 } = {}) {
-    try {
-      const res = await fetch(`/api/news/category/${encodeURIComponent(categorySlug)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && Array.isArray(data.articles)) {
-          const start = (page - 1) * limit;
-          return {
-            items: data.articles.slice(start, start + limit),
-            total: data.articles.length,
-            page,
-            hasMore: start + limit < data.articles.length
-          };
-        }
-      }
-    } catch {
-      // Backend not running, use client fallback
-    }
-
-    const feed = await this.getHomeFeed();
-    const filtered = feed.all.filter(a => 
-      a.categorySlug?.toLowerCase() === categorySlug.toLowerCase() || 
-      a.categoryId?.toLowerCase() === categorySlug.toLowerCase()
-    );
-
-    const start = (page - 1) * limit;
-    return {
-      items: filtered.slice(start, start + limit),
-      total: filtered.length,
-      page,
-      hasMore: start + limit < filtered.length
-    };
+    const offset = (page - 1) * limit;
+    const { items, total } = await this.listActive({ limit, offset, category: categorySlug });
+    return { items, total, page, hasMore: offset + limit < total };
   }
 
-  /**
-   * Search Articles: queries server first, falls back to memory search with multi-token relevance scoring
-   */
   async searchArticles(query = '', { category = 'all', type = 'all' } = {}) {
-    if (!query || !query.trim()) return [];
+    if (!query.trim() || !isConfigured) return [];
+    const nowIso = new Date().toISOString();
+    const queries = [
+      Query.greaterThan('expiresAt', nowIso),
+      Query.orderDesc('publishedAt'),
+      Query.limit(100),
+      Query.search('title', query.trim())
+    ];
+    if (category && category !== 'all') queries.push(Query.equal('categoryId', category));
+    if (type && type !== 'all') queries.push(Query.equal('contentType', type === 'blogs' ? 'blog' : 'news'));
 
-    // 1. Try server search
-    try {
-      const url = new URL('/api/news', window.location.origin);
-      url.searchParams.set('search', query.trim());
-      if (category && category !== 'all') url.searchParams.set('category', category);
-      if (type && type !== 'all') url.searchParams.set('type', type);
-
-      const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && Array.isArray(data.articles)) {
-          return data.articles;
-        }
-      }
-    } catch {
-      // Backend unavailable, fallback to local memory search
-    }
-
-    // 2. Client-side memory fallback with relevance scoring
-    const feed = await this.getHomeFeed();
-    const q = query.trim().toLowerCase();
-    const tokens = q.split(/\s+/).filter(t => t.length > 1);
-
-    const scored = feed.all.map(a => {
-      let score = 0;
-      const titleLower = (a.title || '').toLowerCase();
-      const summaryLower = (a.summary || '').toLowerCase();
-      const contentLower = (a.content || '').toLowerCase();
-      const authorLower = (a.authorName || '').toLowerCase();
-      const sourceLower = (a.sourceName || '').toLowerCase();
-      const catLower = (a.categoryId || a.categorySlug || '').toLowerCase();
-      const tagsLower = Array.isArray(a.tags) ? a.tags.join(' ').toLowerCase() : '';
-
-      if (titleLower === q) score += 200;
-      else if (titleLower.includes(q)) score += 100;
-
-      if (summaryLower.includes(q)) score += 50;
-      if (catLower === q || tagsLower.includes(q)) score += 40;
-      if (sourceLower.includes(q) || authorLower.includes(q)) score += 30;
-
-      for (const token of tokens) {
-        if (titleLower.includes(token)) score += 25;
-        if (summaryLower.includes(token)) score += 15;
-        if (catLower.includes(token) || tagsLower.includes(token)) score += 10;
-        if (contentLower.includes(token)) score += 5;
-      }
-
-      return { article: a, score };
-    });
-
-    let results = scored
-      .filter(item => item.score > 0)
-      .sort((a, b) => b.score - a.score || new Date(b.article.publishedAt) - new Date(a.article.publishedAt))
-      .map(item => item.article);
-
-    if (category && category !== 'all') {
-      results = results.filter(a => a.categoryId === category || a.categorySlug === category);
-    }
-    if (type === 'blogs') {
-      results = results.filter(a => a.contentType === 'blog' || a.sourceType.includes('blog'));
-    } else if (type === 'news') {
-      results = results.filter(a => a.contentType === 'news' || a.sourceType.includes('news'));
-    }
-
-    return results;
+    const res = await databases.listDocuments(
+      APP_CONFIG.appwrite.databaseId,
+      ARTICLES_COLLECTION,
+      queries
+    );
+    return res.documents.map(this.mapDoc);
+    // NOTE: Query.search requires a fulltext index on `title` in the Appwrite
+    // console (Indexes tab). Add a similar index on `summary` for broader matches.
   }
 
-  /**
-   * Fetches nearby news & community blogs based on user geolocation
-   */
+  async getBySlug(slug) {
+    if (!isConfigured) throw new Error('ARTICLE_NOT_FOUND');
+    const res = await databases.listDocuments(
+      APP_CONFIG.appwrite.databaseId,
+      ARTICLES_COLLECTION,
+      [Query.equal('slug', slug), Query.limit(1)]
+    );
+    if (res.documents.length === 0) throw new Error('ARTICLE_NOT_FOUND');
+    const doc = res.documents[0];
+    if (doc.expiresAt && new Date(doc.expiresAt).getTime() <= Date.now()) {
+      throw new Error('CONTENT_EXPIRED');
+    }
+    return this.mapDoc(doc);
+  }
+
   async getNearbyFeed(location = {}) {
     const feed = await this.getHomeFeed();
     const city = (location.city || '').toLowerCase();
     const region = (location.region || '').toLowerCase();
 
     const regional = feed.all.filter(a => {
-      const text = `${a.title || ''} ${a.summary || ''} ${a.content || ''} ${a.categorySlug || ''}`.toLowerCase();
+      const text = `${a.title || ''} ${a.summary || ''} ${a.categorySlug || ''}`.toLowerCase();
       if (region && text.includes(region)) return true;
       if (city && text.includes(city)) return true;
-      if (a.categorySlug === 'india' || a.categorySlug === 'tamil-nadu') return true;
-      return false;
-    });
-
-    const nearbyBlogs = feed.communityBlogs.filter(b => {
-      const text = `${b.title || ''} ${b.summary || ''} ${b.content || ''}`.toLowerCase();
-      if (region && text.includes(region)) return true;
-      if (city && text.includes(city)) return true;
-      return true;
+      return a.categorySlug === 'india' || a.categorySlug === 'tamil-nadu';
     });
 
     return {
       location,
       articles: regional.length > 0 ? regional.slice(0, 8) : feed.all.slice(0, 8),
-      blogs: nearbyBlogs.slice(0, 4)
+      blogs: feed.communityBlogs.slice(0, 4)
     };
   }
 
   /**
-   * Fetches single article by slug
-   */
-  async getBySlug(slug) {
-    // 1. Try server endpoint
-    try {
-      const res = await fetch(`/api/news/${slug}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.article) {
-          this.memoryArticles.set(data.article.id, data.article);
-          return data.article;
-        }
-      }
-    } catch {
-      // fallback
-    }
-
-    // 2. Check in memory
-    for (const art of this.memoryArticles.values()) {
-      if (art.slug === slug) {
-        if (this.isExpired(art)) {
-          throw new Error('CONTENT_EXPIRED');
-        }
-        return art;
-      }
-    }
-
-    // 3. Fallback search
-    const external = await providerRegistry.aggregateAll({ limit: 50 });
-    const found = external.find(a => a.slug === slug);
-    if (found) {
-      this.memoryArticles.set(found.id, found);
-      return found;
-    }
-
-    throw new Error('ARTICLE_NOT_FOUND');
-  }
-
-  /**
-   * Creates or Submits a user community article
-   * Enforces 1-Day (24-Hour) retention ceiling (auto-deleted after 1 day)
+   * Author-submitted content still writes to Appwrite directly from the
+   * client, tagged with a 24h expiresAt; the scheduled cleanup function
+   * purges it like everything else.
    */
   async createCommunityArticle(data, author) {
     if (author?.role === 'reader') {
       throw new Error('Readers are not authorized to publish stories. Please switch your account role to Author.');
     }
+    if (!isConfigured) throw new Error('Appwrite is not configured.');
 
     const now = new Date();
-    // 1-Day (24 hours) retention for user uploaded news and blogs
     const retentionMs = (APP_CONFIG.USER_POST_RETENTION_HOURS || 24) * 60 * 60 * 1000;
     const expiresAt = new Date(now.getTime() + retentionMs).toISOString();
+    const id = `comm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const slug = (data.title || 'story').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 80) + '-' + id.slice(-6);
 
-    const normalized = normalizeArticle({
-      ...data,
-      id: `comm_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-      authorId: author?.id || author?.$id || 'author',
-      authorName: author?.name || 'Community Author',
-      authorUrl: author?.username ? `/author/${author.username}` : '',
-      sourceType: data.sourceType || 'community_blog',
+    const doc = {
+      title: data.title,
+      slug,
+      summary: data.summary,
+      content: data.content,
+      imageUrl: data.imageUrl,
       sourceName: author?.name ? `${author.name} (NewsAxis Author)` : 'Community Author',
-      createdAt: now.toISOString(),
+      sourceUrl: '',
+      authorName: author?.name || 'Author',
+      categoryId: data.categoryId || 'blogs',
+      contentType: 'blog',
+      sourceType: data.sourceType || 'community_blog',
+      tags: JSON.stringify(data.tags || [data.categoryId || 'blogs']),
       publishedAt: now.toISOString(),
-      expiresAt, // Strictly 1 day (24 hours) for user uploads
-      status: 'published',
+      createdAt: now.toISOString(),
+      expiresAt,
+      isBreaking: false,
+      isFeatured: false,
       views: 1,
-      uniqueViews: 1
-    });
-
-    // Try sending to backend server with role authorization
-    try {
-      const userRole = author?.role || 'author';
-      await fetch('/api/blogs', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-User-Role': userRole
-        },
-        body: JSON.stringify({ ...normalized, userRole })
-      });
-    } catch {
-      // server offline, persist locally
-    }
-
-    // Save to Appwrite if configured
-    if (isConfigured) {
-      try {
-        await databases.createDocument(
-          APP_CONFIG.appwrite.databaseId,
-          APP_CONFIG.appwrite.collections.articles,
-          normalized.id,
-          normalized
-        );
-      } catch (err) {
-        console.warn('Appwrite document creation skipped or failed, using local store', err);
-      }
-    }
-
-    this.memoryArticles.set(normalized.id, normalized);
-    this.persistLocalArticles();
-    return normalized;
-  }
-
-  /**
-   * Performs 30-minute cleanup: deletes all expired articles locally
-   */
-  cleanupExpired() {
-    let deletedCount = 0;
-    for (const [id, art] of this.memoryArticles.entries()) {
-      if (this.isExpired(art)) {
-        this.memoryArticles.delete(id);
-        deletedCount++;
-      }
-    }
-    if (deletedCount > 0) {
-      this.persistLocalArticles();
-    }
-    return { deletedCount };
-  }
-
-  /**
-   * Retrieves Sync Radar Status from database server or computes client-side
-   */
-  async getSyncStatus() {
-    try {
-      const res = await fetch('/api/status');
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch {
-      // server offline
-    }
-
-    const cycleMs = APP_CONFIG.SYNC_INTERVAL_MS;
-    const elapsed = Date.now() - this.lastSyncTime;
-    const secondsUntilNext = Math.max(0, Math.floor((cycleMs - (elapsed % cycleMs)) / 1000));
-    const active = Array.from(this.memoryArticles.values()).filter(a => !this.isExpired(a)).length;
-
-    return {
-      status: 'client_active',
-      isSyncing: false,
-      cycleMinutes: APP_CONFIG.RETENTION_MINUTES,
-      secondsUntilNextSync: secondsUntilNext,
-      lastSyncAt: new Date(this.lastSyncTime).toISOString(),
-      nextSyncAt: new Date(this.lastSyncTime + cycleMs).toISOString(),
-      activeArticles: active,
-      totalPurgedHistorical: 0,
-      database: 'Client IndexedDB / LocalStorage'
+      readingTime: Math.max(2, Math.ceil((data.content || '').split(/\s+/).length / 60))
     };
+
+    await databases.createDocument(APP_CONFIG.appwrite.databaseId, ARTICLES_COLLECTION, id, doc);
+    return this.mapDoc({ $id: id, ...doc });
   }
 
-async registerView(articleId) {
-  const art = this.memoryArticles.get(articleId);
-  if (art) {
-    art.views = (art.views || 0) + 1;
-    this.memoryArticles.set(articleId, art);
-    this.persistLocalArticles();
-  }
- 
-  try {
-    await fetch(`/api/news/${articleId}/view`, { method: 'POST' });
-  } catch {
-    // Backend not running or route not implemented yet — silent no-op
-  }
-}
-  /**
-   * Manually trigger an immediate 30-min cycle refresh
-   */
-  async triggerManualSync() {
-    try {
-      const res = await fetch('/api/sync', { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json();
-        this.lastSyncTime = Date.now();
-        return data;
-      }
-    } catch {
-      // server offline
-    }
+  // ---- Client-only conveniences (bookmarks / reactions), not article data ----
 
-    this.cleanupExpired();
-    this.lastSyncTime = Date.now();
-    return await this.getHomeFeed();
-  }
-
-  /**
-   * Bookmarks management
-   */
   getBookmarks() {
     if (typeof window === 'undefined') return [];
     try {
@@ -488,30 +207,18 @@ async registerView(articleId) {
   toggleBookmark(article) {
     const current = this.getBookmarks();
     const index = current.findIndex(b => b.id === article.id);
-    let updated;
-    let isBookmarked;
-
+    let updated, isBookmarked;
     if (index >= 0) {
       updated = current.filter(b => b.id !== article.id);
       isBookmarked = false;
     } else {
-      updated = [
-        {
-          id: article.id,
-          title: article.title,
-          slug: article.slug,
-          imageUrl: article.imageUrl,
-          sourceName: article.sourceName,
-          categorySlug: article.categorySlug || article.categoryId,
-          publishedAt: article.publishedAt,
-          readingTime: article.readingTime,
-          savedAt: new Date().toISOString()
-        },
-        ...current
-      ];
+      updated = [{
+        id: article.id, title: article.title, slug: article.slug, imageUrl: article.imageUrl,
+        sourceName: article.sourceName, categorySlug: article.categorySlug || article.categoryId,
+        publishedAt: article.publishedAt, readingTime: article.readingTime, savedAt: new Date().toISOString()
+      }, ...current];
       isBookmarked = true;
     }
-
     if (typeof window !== 'undefined') {
       localStorage.setItem(LOCAL_STORAGE_BOOKMARKS_KEY, JSON.stringify(updated));
     }
@@ -522,14 +229,10 @@ async registerView(articleId) {
     return this.getBookmarks().some(b => b.id === articleId);
   }
 
-  /**
-   * Reactions management
-   */
   getReaction(articleId) {
     if (typeof window === 'undefined') return null;
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_REACTIONS_KEY);
-      const map = saved ? JSON.parse(saved) : {};
+      const map = JSON.parse(localStorage.getItem(LOCAL_STORAGE_REACTIONS_KEY) || '{}');
       return map[articleId] || null;
     } catch {
       return null;
@@ -537,20 +240,28 @@ async registerView(articleId) {
   }
 
   setReaction(articleId, reactionType) {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined') return null;
     try {
-      const saved = localStorage.getItem(LOCAL_STORAGE_REACTIONS_KEY);
-      const map = saved ? JSON.parse(saved) : {};
-      if (map[articleId] === reactionType) {
-        delete map[articleId];
-      } else {
-        map[articleId] = reactionType;
-      }
+      const map = JSON.parse(localStorage.getItem(LOCAL_STORAGE_REACTIONS_KEY) || '{}');
+      if (map[articleId] === reactionType) delete map[articleId];
+      else map[articleId] = reactionType;
       localStorage.setItem(LOCAL_STORAGE_REACTIONS_KEY, JSON.stringify(map));
       return map[articleId] || null;
     } catch {
       return null;
     }
+  }
+
+  // Kept as no-ops for compatibility with components that still call these;
+  // purging is now done server-side only.
+  cleanupExpired() { return { deletedCount: 0 }; }
+  async getSyncStatus() {
+    return { status: 'appwrite_backed', database: 'Appwrite (server-side 30-min cron)' };
+  }
+  async triggerManualSync() {
+    // No client-triggerable sync anymore — updates come from the scheduled
+    // server job only, per the "no browser-based timer" requirement.
+    return this.getHomeFeed();
   }
 }
 
