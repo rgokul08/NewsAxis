@@ -8,6 +8,7 @@
     "server": "node server/index.js",
     "dev:all": "concurrently \"node server/index.js\" \"vite\"",
     "start": "node server/index.js",
+    "sync": "node scripts/sync-news.js",
     "setup:appwrite": "node scripts/setup-appwrite.js",
     "build": "vite build",
     "test": "vitest run",
