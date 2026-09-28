@@ -41,7 +41,7 @@ export function HomePage() {
   const loadFeed = async (forceServer = false) => {
     try {
       if (forceServer) setRefreshing(true);
-      const res = await articleService.getHomeFeed();
+      const res = await articleService.getHomeFeed({ forceFresh: forceServer });
       setFeed(res);
     } catch (err) {
       console.error('Home feed loading failure', err);
@@ -78,15 +78,17 @@ export function HomePage() {
     setRefreshing(true);
     setSyncNotice('');
     try {
-      const syncResult = await articleService.triggerManualSync();
-      await loadFeed(true);
-      if (syncResult && syncResult.success) {
-        setSyncNotice('✓ Fresh news synced to Appwrite');
-        setTimeout(() => setSyncNotice(''), 4000);
+      const freshFeed = await articleService.triggerManualSync();
+      if (freshFeed && Array.isArray(freshFeed.all)) {
+        setFeed(freshFeed);
+      } else {
+        await loadFeed(true);
       }
+      setSyncNotice('✓ Fresh news updated from live feeds & database');
+      setTimeout(() => setSyncNotice(''), 4000);
     } catch (err) {
       console.error('Manual refresh failure', err);
-      setSyncNotice('Refresh failed. Check Appwrite connection.');
+      setSyncNotice('Refresh failed. Please check connection.');
       setTimeout(() => setSyncNotice(''), 4000);
     } finally {
       setRefreshing(false);
