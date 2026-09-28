@@ -1,55 +1,70 @@
 import { Query } from 'appwrite';
 import { databases, isConfigured } from './appwriteClient';
 import { APP_CONFIG } from '../config/appConfig';
-import { calculateTrendingScore } from '../utils/normalizeArticle';
+import { calculateTrendingScore, deduplicateArticles } from '../utils/normalizeArticle';
+import { formatIST } from '../utils/istDate';
 
 const ARTICLES_COLLECTION = APP_CONFIG.appwrite.collections.articles;
 const LOCAL_STORAGE_BOOKMARKS_KEY = 'newsaxis_local_bookmarks';
 const LOCAL_STORAGE_REACTIONS_KEY = 'newsaxis_local_reactions';
 
 /**
- * ArticleService — READS ONLY FROM APPWRITE.
+ * ArticleService — READS ONLY FROM APPWRITE & RESILIENT BACKEND PIPELINE.
  *
- * The site never calls external news/blog APIs directly. All external
- * ingestion happens server-side (server/index.js or the Appwrite Function
- * in appwrite/functions/sync-news) on a 30-minute IST schedule, which writes
- * normalized, categorized, deduplicated articles into the Appwrite
- * `articles` collection. This service only queries that collection.
+ * The site never calls external news/blog APIs directly from the browser.
+ * All external ingestion happens server-side (server/index.js, Vercel cron,
+ * or Appwrite Function in appwrite/functions/sync-news) on a 30-minute IST schedule,
+ * which writes normalized, categorized, deduplicated articles into the Appwrite
+ * `articles` collection. This service queries that collection directly with
+ * seamless fallback to /api/news.
  */
 class ArticleService {
-  mapDoc(doc) {
+  constructor() {
+    this.memoryArticles = new Map();
+    this.lastSyncTime = Date.now();
+  }
+
+  mapDoc = (doc) => {
+    const pubDate = doc.publishedAt || doc.createdAt || doc.$createdAt || new Date().toISOString();
     return {
-      id: doc.$id,
+      id: doc.$id || doc.id,
       externalId: doc.externalId || doc.external_id || null,
-      providerId: doc.providerId,
-      sourceType: doc.sourceType,
-      contentType: doc.contentType,
-      title: doc.title,
-      slug: doc.slug,
-      summary: doc.summary,
-      content: doc.content,
-      imageUrl: doc.imageUrl,
-      sourceName: doc.sourceName,
-      sourceUrl: doc.sourceUrl,
-      authorName: doc.authorName,
-      categoryId: doc.categoryId,
-      categorySlug: doc.categoryId,
+      providerId: doc.providerId || doc.provider || 'appwrite',
+      sourceType: doc.sourceType || 'external_news',
+      contentType: doc.contentType || 'news',
+      title: doc.title || '',
+      slug: doc.slug || '',
+      summary: doc.summary || doc.description || '',
+      description: doc.description || doc.summary || '',
+      content: doc.content || doc.summary || '',
+      imageUrl: doc.imageUrl || '',
+      sourceName: doc.sourceName || doc.source || 'NewsAxis',
+      sourceUrl: doc.sourceUrl || doc.url || '',
+      url: doc.sourceUrl || doc.url || '',
+      authorName: doc.authorName || doc.author || 'Staff',
+      categoryId: doc.categoryId || doc.category || 'world',
+      categorySlug: doc.categoryId || doc.category || 'world',
       tags: (() => {
-        try { return JSON.parse(doc.tags || '[]'); } catch { return []; }
+        try {
+          return typeof doc.tags === 'string' ? JSON.parse(doc.tags) : (Array.isArray(doc.tags) ? doc.tags : []);
+        } catch {
+          return [];
+        }
       })(),
-      publishedAt: doc.publishedAt,
-      createdAt: doc.createdAt,
+      publishedAt: pubDate,
+      publishedAtIST: formatIST(pubDate),
+      createdAt: doc.createdAt || doc.$createdAt || pubDate,
       expiresAt: doc.expiresAt,
       isBreaking: Boolean(doc.isBreaking),
       isFeatured: Boolean(doc.isFeatured),
       views: doc.views || 0,
       readingTime: doc.readingTime || 3,
-      reactions: { like: 0, helpful: 0, interesting: 0, insightful: 0 }
+      reactions: doc.reactions || { like: 0, helpful: 0, interesting: 0, insightful: 0 }
     };
-  }
+  };
 
   async listActive({ limit = 60, offset = 0, category = null, contentType = null } = {}) {
-    if (!isConfigured) {
+    if (!isConfigured || !databases) {
       return { items: [], total: 0 };
     }
     const nowIso = new Date().toISOString();
@@ -62,16 +77,52 @@ class ArticleService {
     if (category) queries.push(Query.equal('categoryId', category));
     if (contentType) queries.push(Query.equal('contentType', contentType));
 
-    const res = await databases.listDocuments(
-      APP_CONFIG.appwrite.databaseId,
-      ARTICLES_COLLECTION,
-      queries
-    );
-    return { items: res.documents.map(this.mapDoc), total: res.total };
+    try {
+      const res = await databases.listDocuments(
+        APP_CONFIG.appwrite.databaseId,
+        ARTICLES_COLLECTION,
+        queries
+      );
+      return { items: res.documents.map(this.mapDoc), total: res.total };
+    } catch (err) {
+      console.warn('[ArticleService] listActive Appwrite error:', err.message);
+      return { items: [], total: 0 };
+    }
   }
 
   async getHomeFeed({ limit = 100 } = {}) {
-    const { items: all } = await this.listActive({ limit });
+    // 1. Primary: Read from Appwrite
+    let { items: all } = await this.listActive({ limit });
+
+    // 2. Fallback: If Appwrite collection is empty or unreachable, query /api/news
+    if (all.length === 0) {
+      try {
+        const res = await fetch('/api/news', { headers: { 'Accept': 'application/json' } });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.all) && data.all.length > 0) {
+            all = data.all.map(this.mapDoc);
+          }
+        }
+      } catch {
+        // Fallback quiet
+      }
+    }
+
+    // 3. Fallback: Trigger on-demand sync (/api/sync) if both Appwrite & /api/news are completely empty
+    if (all.length === 0) {
+      try {
+        const syncRes = await fetch('/api/sync', { method: 'POST', headers: { 'Accept': 'application/json' } });
+        if (syncRes.ok) {
+          const syncData = await syncRes.json();
+          if (syncData.articles && syncData.articles.length > 0) {
+            all = syncData.articles.map(this.mapDoc);
+          }
+        }
+      } catch {
+        // Quiet
+      }
+    }
 
     const breaking = all.filter(a => a.isBreaking).slice(0, 10);
     const featured = all.find(a => a.isFeatured) || all[0] || null;
@@ -84,50 +135,146 @@ class ArticleService {
       a.contentType === 'blog' || a.sourceType === 'community_blog' || a.sourceType === 'external_blog'
     );
 
-    return { breaking, featured, latest, trending, communityBlogs, all, total: all.length };
+    all.forEach(art => this.memoryArticles.set(art.id, art));
+    this.lastSyncTime = Date.now();
+
+    return {
+      breaking,
+      featured,
+      latest,
+      trending,
+      communityBlogs,
+      all,
+      total: all.length,
+      lastSyncIST: formatIST(new Date())
+    };
   }
 
   async getByCategory(categorySlug, { page = 1, limit = 12 } = {}) {
     const offset = (page - 1) * limit;
-    const { items, total } = await this.listActive({ limit, offset, category: categorySlug });
+    let { items, total } = await this.listActive({ limit, offset, category: categorySlug });
+
+    if (items.length === 0) {
+      // Fallback via /api/news
+      try {
+        const res = await fetch(`/api/news?category=${encodeURIComponent(categorySlug)}&page=${page}&limit=${limit}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.articles) && data.articles.length > 0) {
+            return {
+              items: data.articles.map(this.mapDoc),
+              total: data.total,
+              page,
+              hasMore: data.hasMore
+            };
+          }
+        }
+      } catch {
+        // Quiet
+      }
+    }
+
     return { items, total, page, hasMore: offset + limit < total };
   }
 
   async searchArticles(query = '', { category = 'all', type = 'all' } = {}) {
-    if (!query.trim() || !isConfigured) return [];
-    const nowIso = new Date().toISOString();
-    const queries = [
-      Query.greaterThan('expiresAt', nowIso),
-      Query.orderDesc('publishedAt'),
-      Query.limit(100),
-      Query.search('title', query.trim())
-    ];
-    if (category && category !== 'all') queries.push(Query.equal('categoryId', category));
-    if (type && type !== 'all') queries.push(Query.equal('contentType', type === 'blogs' ? 'blog' : 'news'));
+    if (!query.trim()) return [];
 
-    const res = await databases.listDocuments(
-      APP_CONFIG.appwrite.databaseId,
-      ARTICLES_COLLECTION,
-      queries
+    if (isConfigured && databases) {
+      const nowIso = new Date().toISOString();
+      const queries = [
+        Query.greaterThan('expiresAt', nowIso),
+        Query.orderDesc('publishedAt'),
+        Query.limit(100),
+        Query.search('title', query.trim())
+      ];
+      if (category && category !== 'all') queries.push(Query.equal('categoryId', category));
+      if (type && type !== 'all') queries.push(Query.equal('contentType', type === 'blogs' ? 'blog' : 'news'));
+
+      try {
+        const res = await databases.listDocuments(
+          APP_CONFIG.appwrite.databaseId,
+          ARTICLES_COLLECTION,
+          queries
+        );
+        return res.documents.map(this.mapDoc);
+      } catch (err) {
+        console.warn('[ArticleService] Search index error, falling back:', err.message);
+      }
+    }
+
+    // Fallback: /api/news search
+    try {
+      const url = new URL('/api/news', window.location.origin);
+      url.searchParams.set('search', query.trim());
+      if (category && category !== 'all') url.searchParams.set('category', category);
+      if (type && type !== 'all') url.searchParams.set('type', type);
+
+      const res = await fetch(url.toString(), { headers: { 'Accept': 'application/json' } });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.articles)) {
+          return data.articles.map(this.mapDoc);
+        }
+      }
+    } catch {
+      // Quiet
+    }
+
+    // Memory search fallback
+    const feed = await this.getHomeFeed();
+    const q = query.trim().toLowerCase();
+    return feed.all.filter(a =>
+      (a.title || '').toLowerCase().includes(q) ||
+      (a.summary || '').toLowerCase().includes(q)
     );
-    return res.documents.map(this.mapDoc);
-    // NOTE: Query.search requires a fulltext index on `title` in the Appwrite
-    // console (Indexes tab). Add a similar index on `summary` for broader matches.
   }
 
   async getBySlug(slug) {
-    if (!isConfigured) throw new Error('ARTICLE_NOT_FOUND');
-    const res = await databases.listDocuments(
-      APP_CONFIG.appwrite.databaseId,
-      ARTICLES_COLLECTION,
-      [Query.equal('slug', slug), Query.limit(1)]
-    );
-    if (res.documents.length === 0) throw new Error('ARTICLE_NOT_FOUND');
-    const doc = res.documents[0];
-    if (doc.expiresAt && new Date(doc.expiresAt).getTime() <= Date.now()) {
-      throw new Error('CONTENT_EXPIRED');
+    if (isConfigured && databases) {
+      try {
+        const res = await databases.listDocuments(
+          APP_CONFIG.appwrite.databaseId,
+          ARTICLES_COLLECTION,
+          [Query.equal('slug', slug), Query.limit(1)]
+        );
+        if (res.documents.length > 0) {
+          const doc = res.documents[0];
+          if (doc.expiresAt && new Date(doc.expiresAt).getTime() <= Date.now()) {
+            throw new Error('CONTENT_EXPIRED');
+          }
+          return this.mapDoc(doc);
+        }
+      } catch (err) {
+        if (err.message === 'CONTENT_EXPIRED') throw err;
+      }
     }
-    return this.mapDoc(doc);
+
+    // Check memory
+    for (const art of this.memoryArticles.values()) {
+      if (art.slug === slug) {
+        if (art.expiresAt && new Date(art.expiresAt).getTime() <= Date.now()) {
+          throw new Error('CONTENT_EXPIRED');
+        }
+        return art;
+      }
+    }
+
+    // Fallback search
+    try {
+      const res = await fetch(`/api/news?search=${encodeURIComponent(slug)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.articles)) {
+          const match = data.articles.find(a => a.slug === slug);
+          if (match) return this.mapDoc(match);
+        }
+      }
+    } catch {
+      // Quiet
+    }
+
+    throw new Error('ARTICLE_NOT_FOUND');
   }
 
   async getNearbyFeed(location = {}) {
@@ -150,9 +297,8 @@ class ArticleService {
   }
 
   /**
-   * Author-submitted content still writes to Appwrite directly from the
-   * client, tagged with a 24h expiresAt; the scheduled cleanup function
-   * purges it like everything else.
+   * Author-submitted content writes to Appwrite directly from client
+   * tagged with 24h expiresAt ceiling.
    */
   async createCommunityArticle(data, author) {
     if (author?.role === 'reader') {
@@ -189,7 +335,9 @@ class ArticleService {
     };
 
     await databases.createDocument(APP_CONFIG.appwrite.databaseId, ARTICLES_COLLECTION, id, doc);
-    return this.mapDoc({ $id: id, ...doc });
+    const mapped = this.mapDoc({ $id: id, ...doc });
+    this.memoryArticles.set(id, mapped);
+    return mapped;
   }
 
   // ---- Client-only conveniences (bookmarks / reactions), not article data ----
@@ -252,15 +400,11 @@ class ArticleService {
     }
   }
 
-  // Kept as no-ops for compatibility with components that still call these;
-  // purging is now done server-side only.
   cleanupExpired() { return { deletedCount: 0 }; }
   async getSyncStatus() {
     return { status: 'appwrite_backed', database: 'Appwrite (server-side 30-min cron)' };
   }
   async triggerManualSync() {
-    // No client-triggerable sync anymore — updates come from the scheduled
-    // server job only, per the "no browser-based timer" requirement.
     return this.getHomeFeed();
   }
 }

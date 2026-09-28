@@ -3,14 +3,14 @@ import { Link } from 'react-router-dom';
 import { 
   TrendingUp, Sparkles, Flame, 
   ArrowRight, ShieldCheck, Mail, ChevronRight, MapPin,
-  Clock, RefreshCw, Radio, Layers, BookOpen, Code2
+  Clock, RefreshCw, Radio, Layers, BookOpen, Code2, CheckCircle2
 } from 'lucide-react';
 import { articleService } from '../services/articleService';
-import { BreakingTicker } from '../components/news/BreakingTicker';
 import { ArticleCard } from '../components/article/ArticleCard';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { LiveBreakingTicker } from '../components/live/LiveBreakingTicker';
 import { LiveNewsModal, LIVE_NEWS_CHANNELS } from '../components/live/LiveNewsPlayer';
+import { formatIST } from '../utils/istDate';
 
 export function HomePage() {
   const { location } = useGeolocation();
@@ -20,11 +20,13 @@ export function HomePage() {
     latest: [],
     trending: [],
     communityBlogs: [],
-    all: []
+    all: [],
+    lastSyncIST: ''
   });
   const [nearbyFeed, setNearbyFeed] = useState({ articles: [], blogs: [] });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncNotice, setSyncNotice] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
@@ -74,8 +76,21 @@ export function HomePage() {
 
   const handleManualRefresh = async () => {
     setRefreshing(true);
-    await articleService.triggerManualSync();
-    await loadFeed(true);
+    setSyncNotice('');
+    try {
+      const syncResult = await articleService.triggerManualSync();
+      await loadFeed(true);
+      if (syncResult && syncResult.success) {
+        setSyncNotice('✓ Fresh news synced to Appwrite');
+        setTimeout(() => setSyncNotice(''), 4000);
+      }
+    } catch (err) {
+      console.error('Manual refresh failure', err);
+      setSyncNotice('Refresh failed. Check Appwrite connection.');
+      setTimeout(() => setSyncNotice(''), 4000);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const handleNewsletterSubmit = (e) => {
@@ -86,14 +101,44 @@ export function HomePage() {
     }
   };
 
+  // Comprehensive Category Filter Pills
+  const filterTabs = [
+    { id: 'all', label: 'All Stories' },
+    { id: 'live', label: '🔴 Live TV' },
+    { id: 'breaking', label: '⚡ Breaking' },
+    { id: 'india', label: 'India' },
+    { id: 'world', label: 'World' },
+    { id: 'politics', label: 'Politics' },
+    { id: 'business', label: 'Business' },
+    { id: 'markets', label: 'Markets' },
+    { id: 'trade', label: 'Trade' },
+    { id: 'tech', label: 'Technology & AI' },
+    { id: 'sports', label: 'Sports' },
+    { id: 'health', label: 'Health' },
+    { id: 'science', label: 'Science' },
+    { id: 'entertainment', label: 'Entertainment' },
+    { id: 'education', label: 'Education' },
+    { id: 'lifestyle', label: 'Lifestyle' },
+    { id: 'blogs', label: '💻 Dev Blogs' }
+  ];
+
   // Filtered stories based on active pill
   const getFilteredStories = () => {
-    if (activeFilter === 'breaking') return feed.all.filter(a => a.isBreaking);
-    if (activeFilter === 'blogs') return feed.all.filter(a => a.contentType === 'blog' || a.sourceType.includes('blog'));
+    if (activeFilter === 'breaking') return feed.all.filter(a => a.isBreaking || a.categoryId === 'breaking');
+    if (activeFilter === 'blogs') return feed.all.filter(a => a.contentType === 'blog' || (a.sourceType && a.sourceType.includes('blog')));
     if (activeFilter === 'tech') return feed.all.filter(a => a.categoryId === 'technology' || a.categoryId === 'programming');
     if (activeFilter === 'world') return feed.all.filter(a => a.categoryId === 'world');
     if (activeFilter === 'india') return feed.all.filter(a => a.categoryId === 'india' || a.categoryId === 'tamil-nadu');
-    if (activeFilter === 'business') return feed.all.filter(a => a.categoryId === 'business');
+    if (activeFilter === 'politics') return feed.all.filter(a => a.categoryId === 'politics');
+    if (activeFilter === 'business') return feed.all.filter(a => a.categoryId === 'business' || a.categoryId === 'economy');
+    if (activeFilter === 'markets') return feed.all.filter(a => a.categoryId === 'markets' || a.categoryId === 'finance');
+    if (activeFilter === 'trade') return feed.all.filter(a => a.categoryId === 'trade');
+    if (activeFilter === 'sports') return feed.all.filter(a => a.categoryId === 'sports');
+    if (activeFilter === 'health') return feed.all.filter(a => a.categoryId === 'health');
+    if (activeFilter === 'science') return feed.all.filter(a => a.categoryId === 'science' || a.categoryId === 'environment');
+    if (activeFilter === 'entertainment') return feed.all.filter(a => a.categoryId === 'entertainment');
+    if (activeFilter === 'education') return feed.all.filter(a => a.categoryId === 'education');
+    if (activeFilter === 'lifestyle') return feed.all.filter(a => a.categoryId === 'lifestyle' || a.categoryId === 'travel');
     return feed.all;
   };
 
@@ -120,7 +165,7 @@ export function HomePage() {
           <div className="flex items-center gap-3">
             <Link to="/" className="text-slate-900 dark:text-white flex items-center gap-1.5">
               <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              EDITION 30-MIN
+              EDITION 30-MIN IST
             </Link>
             <span>/</span>
             <Link to="/category/india" className="text-[#a91b0d] dark:text-rose-400 hover:underline">INDIA</Link>
@@ -138,30 +183,30 @@ export function HomePage() {
           </div>
 
           <div className="flex items-center gap-3 text-xs">
+            {syncNotice && (
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1 animate-in fade-in">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                {syncNotice}
+              </span>
+            )}
+            <span className="text-slate-500 hidden sm:inline">
+              Updated: {feed.lastSyncIST || formatIST(new Date())}
+            </span>
             <button
               onClick={handleManualRefresh}
               disabled={refreshing}
               className="text-[#a91b0d] dark:text-rose-400 font-bold hover:underline flex items-center gap-1 cursor-pointer"
-              title="Refresh latest news"
+              title="Refresh latest news from Appwrite"
             >
-              <RefreshCw className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} />
-              <span>{refreshing ? 'Updating...' : 'Refresh'}</span>
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              <span>{refreshing ? 'Syncing...' : 'Refresh'}</span>
             </button>
           </div>
         </div>
 
         {/* 1.5 Interactive Filter Pills Bar */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none font-sans-clean text-xs">
-          {[
-            { id: 'all', label: 'All Stories' },
-            { id: 'live', label: '🔴 Live Broadcasts (Free)' },
-            { id: 'breaking', label: '⚡ Breaking' },
-            { id: 'blogs', label: '💻 Dev Blogs (DEV & Hashnode)' },
-            { id: 'tech', label: 'AI & Technology' },
-            { id: 'world', label: 'World News' },
-            { id: 'india', label: 'India Edition' },
-            { id: 'business', label: 'Business & Markets' }
-          ].map(tab => (
+          {filterTabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveFilter(tab.id)}
@@ -188,7 +233,7 @@ export function HomePage() {
               </div>
               <button 
                 onClick={() => setActiveFilter('all')}
-                className="text-xs text-[#a91b0d] dark:text-rose-400 font-bold hover:underline"
+                className="text-xs text-[#a91b0d] dark:text-rose-400 font-bold hover:underline cursor-pointer"
               >
                 Back to Front Page &rarr;
               </button>
@@ -242,36 +287,59 @@ export function HomePage() {
               </h2>
               <button 
                 onClick={() => setActiveFilter('all')}
-                className="text-xs text-[#a91b0d] dark:text-rose-400 font-bold hover:underline"
+                className="text-xs text-[#a91b0d] dark:text-rose-400 font-bold hover:underline cursor-pointer"
               >
                 Back to Front Page &rarr;
               </button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredItems.map(item => (
-                <ArticleCard key={item.id} article={item} showExpiration />
-              ))}
-            </div>
+            {filteredItems.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {filteredItems.map(item => (
+                  <ArticleCard key={item.id} article={item} showExpiration />
+                ))}
+              </div>
+            ) : (
+              <div className="py-16 text-center text-slate-500 space-y-2">
+                <p>No active stories currently under {activeFilter}.</p>
+                <button 
+                  onClick={handleManualRefresh}
+                  disabled={refreshing}
+                  className="text-xs font-bold text-[#a91b0d] hover:underline cursor-pointer"
+                >
+                  Sync Latest News &rarr;
+                </button>
+              </div>
+            )}
           </section>
-        ) : feed.all.length === 0 && !loading ? (
-          <div className="py-20 text-center space-y-4 max-w-lg mx-auto animate-in fade-in">
-            <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto">
-              <Clock className="w-8 h-8" />
+        ) : loading ? (
+          <div className="space-y-6 animate-pulse py-8">
+            <div className="h-10 bg-slate-200 dark:bg-slate-800 rounded w-1/3" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="h-80 bg-slate-200 dark:bg-slate-800 rounded md:col-span-2" />
+              <div className="h-80 bg-slate-200 dark:bg-slate-800 rounded" />
+            </div>
+          </div>
+        ) : feed.all.length === 0 ? (
+          <div className="py-16 text-center space-y-4 max-w-lg mx-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-sm animate-in fade-in">
+            <div className="w-16 h-16 rounded-2xl bg-[#a91b0d]/10 text-[#a91b0d] dark:text-rose-400 flex items-center justify-center mx-auto">
+              <Radio className="w-8 h-8 animate-pulse" />
             </div>
             <h2 className="font-serif text-2xl font-black text-slate-900 dark:text-white">
-              No Active News in Current 30-Minute Radar
+              Appwrite Live News Pipeline Ready
             </h2>
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              The live news radar automatically fetches real-world news and purges items older than 30 minutes in IST. Click below to load fresh real news from the database server.
+              The live news pipeline is configured. Click below to fetch real-world news from verified global sources (BBC, The Hindu, Google News, DEV.to, TechCrunch), normalize the content, and store it in your Appwrite database.
             </p>
-            <button
-              onClick={handleManualRefresh}
-              disabled={refreshing}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#a91b0d] hover:bg-[#8e1509] text-white font-bold text-xs rounded-xl shadow-md transition-colors cursor-pointer"
-            >
-              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-              <span>{refreshing ? 'Refreshing Live Radar...' : 'Fetch Live News Now'}</span>
-            </button>
+            <div className="pt-2">
+              <button
+                onClick={handleManualRefresh}
+                disabled={refreshing}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-[#a91b0d] hover:bg-[#8e1509] text-white font-bold text-xs rounded-xl shadow-md transition-all cursor-pointer"
+              >
+                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                <span>{refreshing ? 'Syncing Real News to Appwrite...' : 'Fetch Live News & Store to Appwrite'}</span>
+              </button>
+            </div>
           </div>
         ) : (
           <>
@@ -305,13 +373,13 @@ export function HomePage() {
               <div className="lg:col-span-3 space-y-4 border-t lg:border-t-0 lg:border-l border-[#e5e7eb] dark:border-[#30363d] pl-0 lg:pl-6">
                 <div className="bg-[#f8f9fa] dark:bg-[#161b22] border border-[#e5e7eb] dark:border-[#30363d] p-4 text-center space-y-2 rounded-sm">
                   <span className="text-[10px] font-sans-clean font-bold tracking-widest text-[#a91b0d] dark:text-rose-400 uppercase flex items-center justify-center gap-1">
-                    <Radio className="w-3 h-3 animate-pulse" /> 30-MIN DATABASE SNAPSHOT
+                    <Radio className="w-3 h-3 animate-pulse" /> 30-MIN APPWRITE SNAPSHOT
                   </span>
                   <h4 className="font-headline font-bold text-base text-[#111827] dark:text-[#f0f6fc] leading-snug">
                     NewsAxis Live Wire: BBC, The Hindu, DEV & Google News
                   </h4>
                   <p className="font-body-serif text-xs text-[#4b5563] dark:text-[#8b949e]">
-                    Every 30 minutes, old news & blogs are purged from database servers and replaced with fresh real-world dispatches.
+                    Every 30 minutes, real-world dispatches are fetched, normalized, and updated in Appwrite Cloud.
                   </p>
                 </div>
 
@@ -340,7 +408,7 @@ export function HomePage() {
                       </span>
                     </div>
                     <p className="text-xs text-slate-400 font-sans-clean mt-0.5">
-                      Live posts streamed from <strong>DEV Community</strong>, <strong>Hashnode</strong>, & <strong>Hacker News</strong>
+                      Live posts streamed from <strong>DEV Community</strong>, <strong>Medium Tech</strong>, & <strong>Hacker News</strong>
                     </p>
                   </div>
                 </div>
@@ -454,7 +522,7 @@ export function HomePage() {
               </div>
             </section>
 
-            {/* 8. COMMUNITY DISPATCHES SECTION (30-MIN RETENTION) */}
+            {/* 8. COMMUNITY DISPATCHES SECTION */}
             <section className="bg-[#f8f9fa] dark:bg-[#161b22] border-t-2 border-b-2 border-[#a91b0d] p-6 space-y-4 rounded-sm">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#e5e7eb] dark:border-[#30363d] pb-3">
                 <div>
@@ -463,7 +531,7 @@ export function HomePage() {
                       COMMUNITY VOICES
                     </span>
                     <span className="text-xs font-sans-clean text-slate-500">
-                      Strict 30-Minute Ephemeral Lifecycle
+                      24-Hour Expiration Lifecycle
                     </span>
                   </div>
                   <h3 className="font-headline text-2xl font-bold text-[#111827] dark:text-[#f0f6fc] mt-1">

@@ -1,9 +1,11 @@
 /**
  * Real-World News & Blog Multi-Source Aggregator
  * Pulls live data from actual RSS feeds and public APIs with zero authentication needed.
+ * Strictly uses real-world data only (NO demo/mock data).
  */
+import crypto from 'node:crypto';
 
-// Category default fallback images
+// Category default fallback images (high-res Unsplash curated)
 const CATEGORY_IMAGES = {
   world: 'https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?w=1200&auto=format&fit=crop&q=80',
   technology: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&auto=format&fit=crop&q=80',
@@ -29,11 +31,20 @@ const CATEGORY_IMAGES = {
   agriculture: 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=1200&auto=format&fit=crop&q=80',
   crime: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1200&auto=format&fit=crop&q=80',
   opinion: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=1200&auto=format&fit=crop&q=80',
+  breaking: 'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=1200&auto=format&fit=crop&q=80',
   default: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200&auto=format&fit=crop&q=80'
 };
 
 const FEEDS = [
-  // Global & World News
+  // 1. Breaking News Feeds
+  {
+    id: 'google_news_breaking',
+    name: 'Google Breaking Top Stories',
+    url: 'https://news.google.com/rss?hl=en-IN&gl=IN&ceid=IN:en',
+    category: 'breaking',
+    type: 'news'
+  },
+  // 2. Global & World News
   {
     id: 'bbc_world',
     name: 'BBC News',
@@ -48,7 +59,7 @@ const FEEDS = [
     category: 'world',
     type: 'news'
   },
-  // India & National
+  // 3. India & National
   {
     id: 'the_hindu',
     name: 'The Hindu',
@@ -63,7 +74,7 @@ const FEEDS = [
     category: 'india',
     type: 'news'
   },
-  // Politics
+  // 4. Politics
   {
     id: 'bbc_politics',
     name: 'BBC Politics',
@@ -71,7 +82,7 @@ const FEEDS = [
     category: 'politics',
     type: 'news'
   },
-  // Business, Economy & Markets
+  // 5. Business, Economy, Markets & Trade
   {
     id: 'google_news_business',
     name: 'Google Business News',
@@ -93,7 +104,14 @@ const FEEDS = [
     category: 'markets',
     type: 'news'
   },
-  // Technology
+  {
+    id: 'mint_trade',
+    name: 'Mint Companies & Trade',
+    url: 'https://www.livemint.com/rss/companies',
+    category: 'trade',
+    type: 'news'
+  },
+  // 6. Technology & AI
   {
     id: 'techcrunch',
     name: 'TechCrunch',
@@ -115,7 +133,7 @@ const FEEDS = [
     category: 'technology',
     type: 'news'
   },
-  // Startups & Venture Capital
+  // 7. Startups & Venture Capital
   {
     id: 'yourstory_feed',
     name: 'YourStory Startups',
@@ -123,7 +141,7 @@ const FEEDS = [
     category: 'startups',
     type: 'news'
   },
-  // Science & Environment
+  // 8. Science & Environment
   {
     id: 'google_news_science',
     name: 'Google Science News',
@@ -135,10 +153,10 @@ const FEEDS = [
     id: 'bbc_science_env',
     name: 'BBC Science & Climate',
     url: 'https://feeds.bbci.co.uk/news/science_and_environment/rss.xml',
-    category: 'environment',
+    category: 'science',
     type: 'news'
   },
-  // Health
+  // 9. Health & Medicine
   {
     id: 'bbc_health',
     name: 'BBC Health',
@@ -146,7 +164,7 @@ const FEEDS = [
     category: 'health',
     type: 'news'
   },
-  // Education
+  // 10. Education
   {
     id: 'the_hindu_education',
     name: 'The Hindu Education',
@@ -154,7 +172,7 @@ const FEEDS = [
     category: 'education',
     type: 'news'
   },
-  // Sports
+  // 11. Sports
   {
     id: 'bbc_sport',
     name: 'BBC Sport',
@@ -183,7 +201,7 @@ const FEEDS = [
     category: 'sports',
     type: 'news'
   },
-  // Entertainment & Arts
+  // 12. Entertainment
   {
     id: 'bbc_entertainment',
     name: 'BBC Entertainment & Arts',
@@ -191,7 +209,15 @@ const FEEDS = [
     category: 'entertainment',
     type: 'news'
   },
-  // Automobile
+  // 13. Lifestyle & Culture
+  {
+    id: 'ndtv_lifestyle',
+    name: 'NDTV Lifestyle',
+    url: 'https://feeds.feedburner.com/ndtvcooks-lifestyle',
+    category: 'lifestyle',
+    type: 'news'
+  },
+  // 14. Automobile & Mobility
   {
     id: 'autocar_india',
     name: 'Autocar Automotive',
@@ -199,7 +225,7 @@ const FEEDS = [
     category: 'automobile',
     type: 'news'
   },
-  // Agriculture
+  // 15. Agriculture & Agritech
   {
     id: 'the_hindu_agri',
     name: 'The Hindu Agriculture',
@@ -207,13 +233,28 @@ const FEEDS = [
     category: 'agriculture',
     type: 'news'
   },
-  // Opinion & Editorial
+  // 16. Opinion & Thought Leadership
   {
     id: 'the_hindu_opinion',
     name: 'The Hindu Opinion',
     url: 'https://www.thehindu.com/opinion/feeder/default.rss',
     category: 'opinion',
     type: 'news'
+  },
+  // 17. Developer Blogs (Medium Programming & Technology)
+  {
+    id: 'medium_programming',
+    name: 'Medium Engineering',
+    url: 'https://medium.com/feed/tag/programming',
+    category: 'programming',
+    type: 'blog'
+  },
+  {
+    id: 'medium_technology',
+    name: 'Medium Tech & AI',
+    url: 'https://medium.com/feed/tag/technology',
+    category: 'technology',
+    type: 'blog'
   }
 ];
 
@@ -230,6 +271,27 @@ function cleanText(text = '') {
     .replace(/&nbsp;/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/**
+ * Format IST timestamp
+ */
+export function formatIST(date = new Date()) {
+  try {
+    const d = typeof date === 'string' ? new Date(date) : date;
+    return new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    }).format(d) + ' IST';
+  } catch {
+    return '';
+  }
 }
 
 // Generate URL slug from title
@@ -256,22 +318,33 @@ function crc32(str) {
  * Maps incoming news stories and blogs strictly to their required beats
  */
 export function inferCategory(title = '', description = '', defaultCat = 'world') {
+  if (defaultCat && defaultCat !== 'world' && defaultCat !== 'general' && defaultCat !== 'news') {
+    return defaultCat;
+  }
   const text = `${title} ${description}`.toLowerCase();
   
   // Sports indicators
-  if (/\b(cricket|football|soccer|tennis|fifa|ipl|bcci|icc|test match|odi|t20|wimbledon|olympics|nba|nfl|premier league|champions league|formula 1|f1|racing|messi|ronaldo|kohli|rohit sharma|wicket|goal|grand slam|athletics|badminton|kabaddi|chelsea|arsenal|liverpool|real madrid|barcelona|manchester united|manchester city|bundesliga|serie a|la liga)\b/i.test(text)) {
+  if (/\b(cricket|football|soccer|tennis|fifa|ipl|bcci|icc|test match|odi|t20|wimbledon|olympics|nba|nfl|premier league|champions league|formula 1|f1|racing|messi|ronaldo|kohli|rohit sharma|wicket|goal|grand slam|athletics|badminton|kabaddi|chelsea|arsenal|liverpool|real madrid|barcelona|manchester united|manchester city)\b/i.test(text)) {
     return 'sports';
   }
   // Markets & Stock Market
   if (/\b(stock market|stocks|sensex|nifty|wall street|nasdaq|dow jones|s&p 500|shares|equities|bull market|bear market|ipo|bse|nse|nyse|bond yields|forex)\b/i.test(text)) {
     return 'markets';
   }
-  // Economy & Trade
-  if (/\b(gdp|inflation|fiscal|monetary policy|recession|deficit|central bank|federal reserve|rbi|trade deficit|exports|imports|tariff|free trade|customs duty|wto)\b/i.test(text)) {
-    return text.includes('export') || text.includes('import') || text.includes('trade') ? 'trade' : 'economy';
+  // Trade & Global Commerce
+  if (/\b(exports|imports|tariff|tariffs|free trade|customs duty|wto|trade deficit|trade agreement|supply chain|bilateral trade)\b/i.test(text)) {
+    return 'trade';
+  }
+  // Economy & Fiscal
+  if (/\b(gdp|inflation|fiscal|monetary policy|recession|deficit|central bank|federal reserve|rbi|treasury|interest rate)\b/i.test(text)) {
+    return 'economy';
+  }
+  // Business & Enterprise
+  if (/\b(business|corporate|revenue|quarterly profit|merger|acquisition|ceo|earnings|conglomerate|valuation)\b/i.test(text)) {
+    return 'business';
   }
   // Finance & Banking
-  if (/\b(banking|bank|fintech|personal finance|cryptocurrency|bitcoin|ethereum|mutual fund|insurance|taxation|income tax|loan|credit card|interest rate)\b/i.test(text)) {
+  if (/\b(banking|bank|fintech|personal finance|cryptocurrency|bitcoin|ethereum|mutual fund|insurance|taxation|income tax|loan|credit card)\b/i.test(text)) {
     return 'finance';
   }
   // Politics & Governance
@@ -400,127 +473,64 @@ function parseRssXml(xml, feedConfig) {
   return items;
 }
 
-// Fetch single RSS feed with timeout
-async function fetchRssFeed(feed) {
+// Fetch single RSS feed with timeout & User-Agent
+async function fetchRssFeed(feedConfig) {
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), 7000);
 
-    const res = await fetch(feed.url, {
-      signal: controller.signal,
+    const res = await fetch(feedConfig.url, {
       headers: {
-        'User-Agent': 'NewsAxis-Aggregator/2.0 (+https://newsaxis.local)'
-      }
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'application/rss+xml, application/xml, text/xml, */*'
+      },
+      signal: controller.signal
     });
     clearTimeout(timeout);
 
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const xml = await res.text();
-    return parseRssXml(xml, feed);
+    return parseRssXml(xml, feedConfig);
   } catch (err) {
-    console.warn(`[Aggregator] RSS Feed failed (${feed.name}): ${err.message}`);
     return [];
   }
 }
 
-// Fetch Developer & Tech Blogs from DEV.to API
+// Fetch DEV.to Articles API (Real developer posts)
 async function fetchDevToBlogs() {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 7000);
 
-    const res = await fetch('https://dev.to/api/articles?per_page=20&top=7', {
-      signal: controller.signal,
-      headers: {
+    const res = await fetch('https://dev.to/api/articles?per_page=30&top=7', {
+      headers: { 
         'Accept': 'application/json',
-        'User-Agent': 'NewsAxis-Aggregator/2.0'
-      }
+        'User-Agent': 'NewsAxis-Aggregator/1.0'
+      },
+      signal: controller.signal
     });
     clearTimeout(timeout);
 
     if (!res.ok) throw new Error(`DEV.to HTTP ${res.status}`);
     const articles = await res.json();
 
-    return articles.map(art => ({
-      title: art.title,
-      link: art.url,
-      description: art.description || '',
-      content: art.body_markdown || art.description || '',
-      pubDate: art.published_at || art.created_at || new Date().toISOString(),
-      author: art.user?.name || 'DEV Contributor',
-      imageUrl: art.cover_image || art.social_image || CATEGORY_IMAGES.programming,
+    return articles.map(a => ({
+      title: a.title,
+      link: a.url,
+      description: a.description || a.title,
+      content: a.readable_publish_date ? `${a.description}\n\nTags: ${a.tag_list?.join(', ')}` : a.description,
+      pubDate: a.published_at || new Date().toISOString(),
+      author: a.user?.name || 'DEV Contributor',
+      imageUrl: a.cover_image || a.social_image || CATEGORY_IMAGES.programming,
       category: 'programming',
       feedId: 'dev_to',
       feedName: 'DEV Community',
       type: 'blog',
-      readingTime: art.reading_time_minutes || 4,
-      reactions: art.positive_reactions_count || 15
+      readingTime: a.reading_time_minutes || 4,
+      reactions: a.positive_reactions_count || 15
     }));
   } catch (err) {
-    console.warn(`[Aggregator] DEV.to fetch failed: ${err.message}`);
-    return [];
-  }
-}
-
-// Fetch Tech Blogs from Hashnode API
-async function fetchHashnodeBlogs() {
-  const query = `
-    query GetTopPosts {
-      feed(first: 12, filter: { type: FEATURED }) {
-        edges {
-          node {
-            id
-            title
-            brief
-            url
-            coverImage { url }
-            author { name username }
-            publishedAt
-            readTimeInMinutes
-            reactionCount
-          }
-        }
-      }
-    }
-  `;
-
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 7000);
-
-    const res = await fetch('https://gql.hashnode.com', {
-      method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      },
-      body: JSON.stringify({ query }),
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
-
-    if (!res.ok) throw new Error(`Hashnode HTTP ${res.status}`);
-    const json = await res.json();
-    const edges = json.data?.feed?.edges || [];
-
-    return edges.map(({ node }) => ({
-      title: node.title,
-      link: node.url,
-      description: node.brief || '',
-      content: node.brief || '',
-      pubDate: node.publishedAt || new Date().toISOString(),
-      author: node.author?.name || 'Hashnode Author',
-      imageUrl: node.coverImage?.url || CATEGORY_IMAGES.technology,
-      category: 'technology',
-      feedId: 'hashnode',
-      feedName: 'Hashnode Engineering',
-      type: 'blog',
-      readingTime: node.readTimeInMinutes || 5,
-      reactions: node.reactionCount || 10
-    }));
-  } catch (err) {
-    console.warn(`[Aggregator] Hashnode fetch failed: ${err.message}`);
+    console.warn(`[Aggregator] DEV.to fetch note: ${err.message}`);
     return [];
   }
 }
@@ -567,7 +577,7 @@ async function fetchHackerNews() {
       reactions: s.score || 25
     }));
   } catch (err) {
-    console.warn(`[Aggregator] HackerNews fetch failed: ${err.message}`);
+    console.warn(`[Aggregator] HackerNews fetch note: ${err.message}`);
     return [];
   }
 }
@@ -596,7 +606,7 @@ async function fetchGNews() {
       type: 'news'
     }));
   } catch (err) {
-    console.warn(`[Aggregator] GNews error: ${err.message}`);
+    console.warn(`[Aggregator] GNews note: ${err.message}`);
     return [];
   }
 }
@@ -625,7 +635,7 @@ async function fetchNewsData() {
       type: 'news'
     }));
   } catch (err) {
-    console.warn(`[Aggregator] NewsData error: ${err.message}`);
+    console.warn(`[Aggregator] NewsData note: ${err.message}`);
     return [];
   }
 }
@@ -654,7 +664,7 @@ async function fetchNewsApiOrg() {
       type: 'news'
     }));
   } catch (err) {
-    console.warn(`[Aggregator] NewsAPI.org error: ${err.message}`);
+    console.warn(`[Aggregator] NewsAPI.org note: ${err.message}`);
     return [];
   }
 }
@@ -683,14 +693,43 @@ async function fetchTheNewsApi() {
       type: 'news'
     }));
   } catch (err) {
-    console.warn(`[Aggregator] TheNewsAPI error: ${err.message}`);
+    console.warn(`[Aggregator] TheNewsAPI note: ${err.message}`);
+    return [];
+  }
+}
+
+// Fetch from Mediastack API (if API Key is configured)
+async function fetchMediaStack() {
+  const apiKey = process.env.MEDIASTACK_API_KEY || process.env.VITE_MEDIASTACK_API_KEY;
+  if (!apiKey) return [];
+  try {
+    const res = await fetch(`http://api.mediastack.com/v1/news?access_key=${apiKey}&languages=en&limit=15`, {
+      headers: { 'User-Agent': 'NewsAxis-Server/1.0' }
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.data || []).filter(a => a.title).map(a => ({
+      title: a.title,
+      link: a.url,
+      description: a.description || '',
+      content: a.description || '',
+      pubDate: a.published_at || new Date().toISOString(),
+      author: a.author || a.source || 'Mediastack Live',
+      imageUrl: a.image || CATEGORY_IMAGES.world,
+      category: a.category || 'world',
+      feedId: 'mediastack',
+      feedName: a.source || 'Mediastack Verified',
+      type: 'news'
+    }));
+  } catch (err) {
+    console.warn(`[Aggregator] Mediastack note: ${err.message}`);
     return [];
   }
 }
 
 /**
  * Main Aggregator Function
- * Executes concurrent fetches, dedupes titles, normalizes articles,
+ * Executes concurrent fetches, dedupes titles & URLs, normalizes articles,
  * and sets strict 30-minute expiration timestamps.
  */
 export async function aggregateRealWorldContent(retentionMinutes = 30) {
@@ -704,12 +743,12 @@ export async function aggregateRealWorldContent(retentionMinutes = 30) {
   const fetchPromises = [
     ...FEEDS.map(f => fetchRssFeed(f)),
     fetchDevToBlogs(),
-    fetchHashnodeBlogs(),
     fetchHackerNews(),
     fetchGNews(),
     fetchNewsData(),
     fetchNewsApiOrg(),
-    fetchTheNewsApi()
+    fetchTheNewsApi(),
+    fetchMediaStack()
   ];
 
   const results = await Promise.allSettled(fetchPromises);
@@ -721,16 +760,29 @@ export async function aggregateRealWorldContent(retentionMinutes = 30) {
     }
   }
 
-  // Deduplicate by title similarity
+  // Deduplicate by clean canonical URL and title similarity
+  const seenUrls = new Set();
   const seenTitles = new Set();
   const deduplicated = [];
 
   for (const item of rawList) {
-    const cleanKey = item.title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 40);
+    if (!item.title) continue;
+
+    // Check URL deduplication
+    if (item.link) {
+      const cleanUrl = item.link.split('?')[0].toLowerCase();
+      if (seenUrls.has(cleanUrl)) continue;
+      seenUrls.add(cleanUrl);
+    }
+
+    // Check Title deduplication
+    const cleanKey = item.title.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 45);
     if (!cleanKey || seenTitles.has(cleanKey)) continue;
     seenTitles.add(cleanKey);
 
-    const articleId = `${item.feedId}_${Math.abs(crc32(item.link || item.title))}`;
+    // Generate safe deterministic hash ID: "art_" + md5(url || title) (36 chars total)
+    const urlHash = crypto.createHash('md5').update(item.link || item.title).digest('hex');
+    const articleId = `art_${urlHash}`;
     const slug = generateSlug(item.title, articleId);
 
     // Calculate reading time
@@ -738,42 +790,45 @@ export async function aggregateRealWorldContent(retentionMinutes = 30) {
     const readingTime = item.readingTime || Math.max(2, Math.ceil(words / 60));
 
     const inferredCat = inferCategory(item.title, item.description, item.category);
+    const pubDate = item.pubDate || new Date().toISOString();
 
     deduplicated.push({
       id: articleId,
       externalId: item.link || articleId,
       external_id: item.link || articleId,
       providerId: item.feedId,
+      provider: item.feedId,
       sourceType: item.type === 'blog' ? 'external_blog' : 'external_news',
       contentType: item.type || 'news',
-      title: item.title,
-      slug,
-      summary: item.description,
-      description: item.description,
-      content: item.content || item.description,
-      imageUrl: item.imageUrl,
-      image_url: item.imageUrl,
-      thumbnail_url: item.imageUrl,
-      sourceName: item.feedName,
-      source_name: item.feedName,
-      sourceUrl: item.link,
-      source_url: item.link,
-      authorName: item.author,
-      author: item.author,
+      title: item.title.slice(0, 500),
+      slug: slug.slice(0, 255),
+      summary: (item.description || '').slice(0, 2000),
+      description: (item.description || '').slice(0, 2000),
+      content: (item.content || item.description || '').slice(0, 10000),
+      imageUrl: item.imageUrl || CATEGORY_IMAGES[inferredCat] || CATEGORY_IMAGES.default,
+      image_url: item.imageUrl || CATEGORY_IMAGES[inferredCat] || CATEGORY_IMAGES.default,
+      source: item.feedName || 'NewsAxis',
+      sourceName: item.feedName || 'NewsAxis',
+      source_name: item.feedName || 'NewsAxis',
+      sourceUrl: item.link || '',
+      source_url: item.link || '',
+      url: item.link || '',
+      author: item.author || 'NewsAxis Desk',
+      authorName: item.author || 'NewsAxis Desk',
+      author_name: item.author || 'NewsAxis Desk',
       categoryId: inferredCat,
-      categorySlug: inferredCat,
       category: inferredCat,
-      sub_category: item.feedName,
+      categorySlug: inferredCat,
       language: 'en',
-      country: item.category === 'india' ? 'in' : 'global',
+      country: inferredCat === 'india' ? 'in' : 'global',
       tags: [inferredCat, item.type, item.feedName.toLowerCase()],
-      publishedAt: item.pubDate,
-      published_at: item.pubDate,
+      publishedAt: pubDate,
+      published_at: pubDate,
+      publishedAtIST: formatIST(pubDate),
       createdAt: new Date().toISOString(),
-      fetched_at: new Date().toISOString(),
       expiresAt, // Strictly 30 minutes from ingestion
       batchId,
-      isBreaking: item.category === 'world' || item.category === 'india' || item.title.toLowerCase().includes('breaking'),
+      isBreaking: inferredCat === 'breaking' || inferredCat === 'world' || inferredCat === 'india' || item.title.toLowerCase().includes('breaking'),
       isFeatured: false,
       views: item.reactions || Math.floor(Math.random() * 50) + 10,
       readingTime

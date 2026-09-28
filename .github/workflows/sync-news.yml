@@ -1,0 +1,46 @@
+name: NewsAxis 30-Minute News Sync
+
+on:
+  schedule:
+    # Triggers every 30 minutes to refresh news and purge expired content
+    - cron: '*/30 * * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  sync-news:
+    name: Sync Live News & Blogs to Appwrite
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run News Sync Script
+        env:
+          APPWRITE_ENDPOINT: ${{ secrets.APPWRITE_ENDPOINT || 'https://sgp.cloud.appwrite.io/v1' }}
+          APPWRITE_PROJECT_ID: ${{ secrets.APPWRITE_PROJECT_ID }}
+          APPWRITE_API_KEY: ${{ secrets.APPWRITE_API_KEY }}
+          APPWRITE_DATABASE_ID: ${{ secrets.APPWRITE_DATABASE_ID || 'newsaxis-main' }}
+          NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
+          GNEWS_API_KEY: ${{ secrets.GNEWS_API_KEY }}
+          NEWSDATA_API_KEY: ${{ secrets.NEWSDATA_API_KEY }}
+          MEDIASTACK_API_KEY: ${{ secrets.MEDIASTACK_API_KEY }}
+          THENEWSAPI_API_KEY: ${{ secrets.THENEWSAPI_API_KEY }}
+        run: node scripts/sync-news.js
+
+      - name: Trigger Deployed Vercel /api/sync (Optional)
+        if: env.VERCEL_APP_URL != ''
+        env:
+          VERCEL_APP_URL: ${{ secrets.VERCEL_APP_URL }}
+        run: |
+          curl -s -X POST "$VERCEL_APP_URL/api/sync?trigger=github_action_cron" || true

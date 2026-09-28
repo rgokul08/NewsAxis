@@ -137,6 +137,9 @@ export function calculateTrendingScore(article) {
  * Client-Side Intelligent Category Inference
  */
 export function inferCategoryClient(title = '', description = '', defaultCat = 'world') {
+  if (defaultCat && defaultCat !== 'world' && defaultCat !== 'general' && defaultCat !== 'news') {
+    return defaultCat;
+  }
   const text = `${title} ${description}`.toLowerCase();
   
   // Sports indicators (Cricket, Football, Tennis, F1, Olympics, etc.)
