@@ -1,4 +1,3 @@
-import { DevToProvider } from './devProvider';
 import { HashnodeProvider } from './hashnodeProvider';
 import { PublicFeedProvider } from './publicFeedProvider';
 import { GNewsProvider } from './gNewsProvider';
@@ -6,6 +5,7 @@ import { TheNewsApiProvider } from './theNewsApiProvider';
 import { NewsDataProvider } from './newsDataProvider';
 import { MediaStackProvider } from './mediaStackProvider';
 import { NewsApiOrgProvider } from './newsApiOrgProvider';
+import { DevToProvider } from './devProvider';
 import { deduplicateArticles } from '../utils/normalizeArticle';
 
 /**
@@ -23,6 +23,7 @@ import { deduplicateArticles } from '../utils/normalizeArticle';
  * - TechCrunch
  * - Wired
  * - Medium
+
  */
 class ProviderRegistry {
   constructor() {

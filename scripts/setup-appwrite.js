@@ -1,7 +1,8 @@
-import { Client, Databases, Storage, Permission, Role } from 'node-appwrite';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+// scripts/setup-appwrite.js
+import { Client, Databases, Storage, Permission, Role, IndexType } from 'node-appwrite';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,7 +34,7 @@ try {
 }
 
 const cliProjectId = process.argv[2];
-let ENDPOINT = process.env.APPWRITE_ENDPOINT || process.env.VITE_APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1';
+let ENDPOINT = process.env.APPWRITE_ENDPOINT || process.env.VITE_APPWRITE_ENDPOINT || 'https://sgp.cloud.appwrite.io/v1';
 const PROJECT_ID = cliProjectId || process.env.APPWRITE_PROJECT_ID || process.env.VITE_APPWRITE_PROJECT_ID;
 const API_KEY = process.env.APPWRITE_API_KEY;
 const DATABASE_ID = process.env.APPWRITE_DATABASE_ID || process.env.VITE_APPWRITE_DATABASE_ID || 'newsaxis-main';
@@ -64,15 +65,10 @@ if (PROJECT_ID === '6a854c5d0026a9224d01' && !ENDPOINT.includes('sgp.')) {
   ENDPOINT = 'https://sgp.cloud.appwrite.io/v1';
 }
 
-const client = new Client()
-  .setEndpoint(ENDPOINT)
-  .setProject(PROJECT_ID)
-  .setKey(API_KEY);
-
+const client = new Client().setEndpoint(ENDPOINT).setProject(PROJECT_ID).setKey(API_KEY);
 const databases = new Databases(client);
 const storage = new Storage(client);
-
-const sleep = (ms) => new Promise(res => setTimeout(res, ms));
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 async function verifyScopes() {
   console.log('[Step 0/5] Pre-flight Scope Verification...');
@@ -108,204 +104,149 @@ async function verifyScopes() {
   }
 }
 
-async function setup() {
-  await verifyScopes();
-
-  // 1. Create or verify database
-  console.log(`\n[Step 1/5] Checking Database "${DATABASE_ID}"...`);
+async function ensureDb() {
   try {
     await databases.get(DATABASE_ID);
-    console.log(`  ✓ Database "${DATABASE_ID}" exists and is ready.`);
-  } catch (e) {
-    if (e.code === 404) {
-      console.log(`  + Creating Database "${DATABASE_ID}"...`);
-      await databases.create(DATABASE_ID, 'NewsAxis Main Database');
-      console.log(`  ✓ Database "${DATABASE_ID}" created successfully.`);
-    } else {
-      throw e;
-    }
+    console.log(`  ✓ Database "${DATABASE_ID}" exists.`);
+  } catch {
+    console.log(`  + Creating Database "${DATABASE_ID}"...`);
+    await databases.create(DATABASE_ID, 'NewsAxis Main Database');
+    console.log(`  ✓ Database "${DATABASE_ID}" created.`);
   }
+}
 
-  // Helper to ensure collection exists
-  async function ensureCollection(colId, colName, permissions = []) {
-    try {
-      await databases.getCollection(DATABASE_ID, colId);
-      console.log(`  ✓ Collection "${colId}" exists.`);
-    } catch (e) {
-      if (e.code === 404) {
-        console.log(`  + Creating Collection "${colId}" (${colName})...`);
-        await databases.createCollection(
-          DATABASE_ID,
-          colId,
-          colName,
-          permissions.length > 0 ? permissions : [
-            Permission.read(Role.any()),
-            Permission.create(Role.any()),
-            Permission.update(Role.users()),
-            Permission.delete(Role.users())
-          ]
-        );
-        console.log(`  ✓ Collection "${colId}" created.`);
-        await sleep(800);
-      } else {
-        throw e;
-      }
-    }
+async function ensureCollection(id, name, perms) {
+  try {
+    await databases.getCollection(DATABASE_ID, id);
+    console.log(`  ✓ Collection "${id}" exists.`);
+  } catch {
+    console.log(`  + Creating Collection "${id}" (${name})...`);
+    await databases.createCollection(DATABASE_ID, id, name, perms);
+    await sleep(800);
+    console.log(`  ✓ Collection "${id}" created.`);
   }
+}
 
-  // Helper to ensure string attribute
-  async function ensureStringAttr(colId, key, size, required = false, defaultValue = undefined) {
-    try {
-      await databases.createStringAttribute(DATABASE_ID, colId, key, size, required, defaultValue);
-      console.log(`    + Created string attribute: ${key} (max ${size})`);
-      await sleep(600);
-    } catch (e) {
-      // Attribute might already exist
-    }
-  }
+async function str(col, key, size, required = false, def) {
+  try { await databases.createStringAttribute(DATABASE_ID, col, key, size, required, def); await sleep(500); } catch {}
+}
+async function bool(col, key, required = false, def = false) {
+  try { await databases.createBooleanAttribute(DATABASE_ID, col, key, required, def); await sleep(500); } catch {}
+}
+async function int(col, key, required = false, min, max, def) {
+  try { await databases.createIntegerAttribute(DATABASE_ID, col, key, required, min, max, def); await sleep(500); } catch {}
+}
+async function index(col, key, type, attrs) {
+  try { await databases.createIndex(DATABASE_ID, col, key, type, attrs); await sleep(500); } catch {}
+}
 
-  // Helper to ensure boolean attribute
-  async function ensureBoolAttr(colId, key, required = false, defaultValue = false) {
-    try {
-      await databases.createBooleanAttribute(DATABASE_ID, colId, key, required, defaultValue);
-      console.log(`    + Created boolean attribute: ${key}`);
-      await sleep(600);
-    } catch (e) {
-      // Already exists
-    }
-  }
+async function run() {
+  await verifyScopes();
 
-  // Helper to ensure integer attribute
-  async function ensureIntAttr(colId, key, required = false, min = undefined, max = undefined, defaultValue = undefined) {
-    try {
-      await databases.createIntegerAttribute(DATABASE_ID, colId, key, required, min, max, defaultValue);
-      console.log(`    + Created integer attribute: ${key}`);
-      await sleep(600);
-    } catch (e) {
-      // Already exists
-    }
-  }
+  // 1. DATABASE
+  console.log(`\n[Step 1/5] Checking Database "${DATABASE_ID}"...`);
+  await ensureDb();
 
-  // Helper to ensure index
-  async function ensureIndex(colId, key, type, attributes, orders = []) {
-    try {
-      await databases.createIndex(DATABASE_ID, colId, key, type, attributes, orders);
-      console.log(`    + Created index: ${key} on [${attributes.join(', ')}]`);
-      await sleep(800);
-    } catch (e) {
-      // Index might already exist
-    }
-  }
-
-  // 2. Setup Articles Collection
+  // 2. ARTICLES
   console.log(`\n[Step 2/5] Configuring "articles" Collection & Attributes...`);
-  await ensureCollection('articles', 'News & Blog Articles', [
+  await ensureCollection('articles', 'Articles', [
     Permission.read(Role.any()),
-    Permission.create(Role.any()),
-    Permission.update(Role.any()),
-    Permission.delete(Role.any())
+    Permission.create(Role.users()),
+    Permission.update(Role.users()),
+    Permission.delete(Role.users()),
   ]);
 
-  await ensureStringAttr('articles', 'title', 500, true);
-  await ensureStringAttr('articles', 'slug', 255, true);
-  await ensureStringAttr('articles', 'description', 2000, false);
-  await ensureStringAttr('articles', 'summary', 2000, false);
-  await ensureStringAttr('articles', 'content', 10000, false);
-  await ensureStringAttr('articles', 'imageUrl', 1000, false);
-  await ensureStringAttr('articles', 'source', 150, false, 'NewsAxis');
-  await ensureStringAttr('articles', 'sourceName', 150, false, 'NewsAxis');
-  await ensureStringAttr('articles', 'sourceUrl', 1000, false);
-  await ensureStringAttr('articles', 'url', 1000, false);
-  await ensureStringAttr('articles', 'author', 150, false, 'Staff');
-  await ensureStringAttr('articles', 'authorName', 150, false, 'Staff');
-  await ensureStringAttr('articles', 'authorId', 100, false);
-  await ensureStringAttr('articles', 'category', 100, false, 'world');
-  await ensureStringAttr('articles', 'categoryId', 100, false, 'world');
-  await ensureStringAttr('articles', 'provider', 100, false, 'rss');
-  await ensureStringAttr('articles', 'language', 20, false, 'en');
-  await ensureStringAttr('articles', 'contentType', 50, false, 'news');
-  await ensureStringAttr('articles', 'sourceType', 50, false, 'external_news');
-  await ensureStringAttr('articles', 'publishedAt', 100, false);
-  await ensureStringAttr('articles', 'createdAt', 100, false);
-  await ensureStringAttr('articles', 'expiresAt', 100, false);
-  await ensureBoolAttr('articles', 'isBreaking', false, false);
-  await ensureBoolAttr('articles', 'isFeatured', false, false);
-  await ensureIntAttr('articles', 'views', false, 0, 10000000, 1);
-  await ensureIntAttr('articles', 'readingTime', false, 1, 60, 3);
+  await str('articles', 'title', 255, true);
+  await str('articles', 'slug', 150, true);
+  await str('articles', 'summary', 1000);
+  await str('articles', 'content', 50000);
+  await str('articles', 'imageUrl', 1000);
+  await str('articles', 'sourceName', 100, false, 'NewsAxis');
+  await str('articles', 'sourceUrl', 1000);
+  await str('articles', 'authorName', 100, false, 'Staff');
+  await str('articles', 'authorId', 100);
+  await str('articles', 'categoryId', 50, false, 'world');
+  await str('articles', 'contentType', 20, false, 'news');
+  await str('articles', 'sourceType', 50, false, 'external_news');
+  await str('articles', 'tags', 2000);              // JSON string
+  await str('articles', 'publishedAt', 50);
+  await str('articles', 'createdAt', 50);
+  await str('articles', 'expiresAt', 50, true);      // required — every doc must expire
+  await bool('articles', 'isBreaking', false, false);
+  await bool('articles', 'isFeatured', false, false);
+  await int('articles', 'views', false, 0, 100000000, 1);
+  await int('articles', 'readingTime', false, 1, 60, 3);
 
   console.log('  Configuring "articles" Indexes...');
-  await ensureIndex('articles', 'idx_slug', 'key', ['slug']);
-  await ensureIndex('articles', 'idx_category', 'key', ['categoryId']);
-  await ensureIndex('articles', 'idx_published', 'key', ['publishedAt']);
-  await ensureIndex('articles', 'idx_expires', 'key', ['expiresAt']);
+  await index('articles', 'idx_slug', IndexType.Unique, ['slug']);
+  await index('articles', 'idx_expires', IndexType.Key, ['expiresAt']);
+  await index('articles', 'idx_category', IndexType.Key, ['categoryId']);
+  await index('articles', 'idx_published', IndexType.Key, ['publishedAt']);
+  await index('articles', 'idx_title_fulltext', IndexType.Fulltext, ['title']); // needed for Query.search('title', ...)
 
-  // 3. Setup Profiles, Comments, Bookmarks Collections
-  console.log(`\n[Step 3/5] Configuring Supporting Collections (profiles, comments, bookmarks)...`);
-  await ensureCollection('profiles', 'User Profiles', [
+  // 3. PROFILES, COMMENTS, BOOKMARKS
+  console.log(`\n[Step 3/5] Configuring Supporting Collections...`);
+  await ensureCollection('profiles', 'Profiles', [
     Permission.read(Role.any()),
     Permission.create(Role.users()),
     Permission.update(Role.users()),
-    Permission.delete(Role.users())
+    Permission.delete(Role.users()),
   ]);
-  await ensureStringAttr('profiles', 'userId', 100, true);
-  await ensureStringAttr('profiles', 'name', 100, true);
-  await ensureStringAttr('profiles', 'username', 50, true);
-  await ensureStringAttr('profiles', 'email', 150, false);
-  await ensureStringAttr('profiles', 'bio', 500, false);
-  await ensureStringAttr('profiles', 'avatarUrl', 1000, false);
-  await ensureStringAttr('profiles', 'role', 20, false, 'author');
+  await str('profiles', 'userId', 100, true);
+  await str('profiles', 'name', 100, true);
+  await str('profiles', 'username', 50, true);
+  await str('profiles', 'email', 150);
+  await str('profiles', 'bio', 500);
+  await str('profiles', 'avatarUrl', 1000);
+  await str('profiles', 'role', 20, false, 'reader');
 
-  await ensureCollection('comments', 'Article Comments', [
+  await ensureCollection('comments', 'Comments', [
     Permission.read(Role.any()),
     Permission.create(Role.users()),
     Permission.update(Role.users()),
-    Permission.delete(Role.users())
+    Permission.delete(Role.users()),
   ]);
-  await ensureStringAttr('comments', 'articleId', 100, true);
-  await ensureStringAttr('comments', 'userId', 100, true);
-  await ensureStringAttr('comments', 'userName', 100, false);
-  await ensureStringAttr('comments', 'content', 2000, true);
-  await ensureStringAttr('comments', 'createdAt', 50, false);
+  await str('comments', 'articleId', 100, true);
+  await str('comments', 'userId', 100, true);
+  await str('comments', 'userName', 100, false);
+  await str('comments', 'content', 2000, true);
+  await str('comments', 'createdAt', 50, false);
 
-  await ensureCollection('bookmarks', 'User Bookmarks', [
+  await ensureCollection('bookmarks', 'Bookmarks', [
     Permission.read(Role.users()),
     Permission.create(Role.users()),
     Permission.update(Role.users()),
-    Permission.delete(Role.users())
+    Permission.delete(Role.users()),
   ]);
-  await ensureStringAttr('bookmarks', 'userId', 100, true);
-  await ensureStringAttr('bookmarks', 'articleId', 100, true);
-  await ensureStringAttr('bookmarks', 'createdAt', 50, false);
+  await str('bookmarks', 'userId', 100, true);
+  await str('bookmarks', 'articleId', 100, true);
+  await str('bookmarks', 'createdAt', 50, false);
 
-  // 4. Setup Storage Bucket
+  // 4. BUCKET
   console.log(`\n[Step 4/5] Configuring Storage Bucket "${BUCKET_ID}"...`);
   try {
     await storage.getBucket(BUCKET_ID);
     console.log(`  ✓ Bucket "${BUCKET_ID}" exists.`);
-  } catch (e) {
-    if (e.code === 404) {
-      console.log(`  + Creating Bucket "${BUCKET_ID}"...`);
-      await storage.createBucket(
-        BUCKET_ID,
-        'NewsAxis Media Assets',
-        [
-          Permission.read(Role.any()),
-          Permission.create(Role.users()),
-          Permission.update(Role.users()),
-          Permission.delete(Role.users())
-        ],
-        false, // fileSecurity false allows public image preview
-        true,  // enabled
-        10 * 1024 * 1024,
-        ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg']
-      );
-      console.log(`  ✓ Bucket "${BUCKET_ID}" created successfully.`);
-    } else {
-      console.warn(`  Bucket warning: ${e.message}`);
-    }
+  } catch {
+    console.log(`  + Creating Bucket "${BUCKET_ID}"...`);
+    await storage.createBucket(
+      BUCKET_ID,
+      'NewsAxis Media',
+      [
+        Permission.read(Role.any()),
+        Permission.create(Role.users()),
+        Permission.update(Role.users()),
+        Permission.delete(Role.users()),
+      ],
+      false, // fileSecurity false allows public preview
+      true,
+      10 * 1024 * 1024,
+      ['jpg', 'jpeg', 'png', 'webp', 'gif']
+    );
+    console.log(`  ✓ Bucket "${BUCKET_ID}" created.`);
   }
 
-  // 5. Test Live Document Write & Read
+  // 5. TEST WRITE & READ
   console.log(`\n[Step 5/5] Performing Live Verification Write & Read...`);
   try {
     const testDocId = 'test_init_' + Date.now().toString(36);
@@ -315,23 +256,28 @@ async function setup() {
       testDocId,
       {
         title: 'NewsAxis Pipeline Operational Test',
-        slug: 'newsaxis-pipeline-operational-test',
-        description: 'Verification article confirming Appwrite write/read access.',
+        slug: 'newsaxis-pipeline-operational-test-' + Date.now().toString(36),
         summary: 'Verification article confirming Appwrite write/read access.',
         content: 'Pipeline active. Real-world news will sync on next 30-min cycle.',
+        imageUrl: '',
         sourceName: 'NewsAxis System',
+        sourceUrl: 'https://newsaxis.local',
         authorName: 'System Diagnostic',
+        authorId: 'system',
         categoryId: 'technology',
+        contentType: 'news',
+        sourceType: 'external_news',
+        tags: JSON.stringify(['technology', 'system']),
         publishedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
         expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
         isBreaking: false,
+        isFeatured: false,
         views: 1,
         readingTime: 1
       }
     );
     console.log(`  ✓ Document write verified (ID: ${testDoc.$id})`);
-    
-    // Clean up test document
     await databases.deleteDocument(DATABASE_ID, 'articles', testDocId);
     console.log(`  ✓ Document delete verified.`);
   } catch (writeErr) {
@@ -340,12 +286,10 @@ async function setup() {
 
   console.log('\n========================================================');
   console.log('  🎉 APPWRITE DATABASE & STORAGE SETUP COMPLETE!         ');
-  console.log('========================================================');
-  console.log('\nYour Appwrite database is configured and ready to receive news.');
-  console.log('Run `npm run server` or trigger `/api/sync` to populate real news!\n');
+  console.log('========================================================\n');
 }
 
-setup().catch(err => {
-  console.error('\n❌ Setup error:', err.message);
+run().catch(e => {
+  console.error('\n❌ Setup error:', e.message);
   process.exit(1);
 });

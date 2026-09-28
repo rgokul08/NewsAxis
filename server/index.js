@@ -22,6 +22,21 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // Robust Environment Loader
 function loadEnv() {
   const envFiles = [path.resolve(__dirname, '../.env.local'), path.resolve(__dirname, '../.env')];
@@ -42,7 +57,13 @@ function loadEnv() {
         }
       });
     }
+
+
+
+
+
   }
+
 }
 loadEnv();
 
@@ -120,6 +141,7 @@ async function executeSyncCycle(triggerReason = 'scheduled_ist_boundary') {
   console.log(`[Scheduler] 30-MIN DATA REFRESH TRIGGERED (${triggerReason})`);
   console.log(`[Indian Standard Time: ${formatIST(now)}]`);
   console.log(`======================================================`);
+
 
   try {
     // 1. Purge expired items (both SQLite & Appwrite)
@@ -287,12 +309,37 @@ app.get('/api/news', (req, res) => {
         .map(item => item.article);
     }
 
+
+
+
+
+
+
+
+
+
+
+
     // Partition sections
     const breaking = active.filter(a => a.isBreaking).slice(0, 10);
     const featured = active.find(a => a.isFeatured) || active[0] || null;
     const latest = [...active].sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt)).slice(0, 20);
     const blogs = active.filter(a => a.contentType === 'blog' || (a.sourceType && a.sourceType.includes('blog')));
     const trending = [...active].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 10);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     const pageSize = parseInt(limit, 10) || 50;
     const pageNum = parseInt(page, 10) || 1;
@@ -401,6 +448,25 @@ app.get('/api/search', (req, res) => {
         if (summaryLower.includes(token)) score += 15;
         if (catLower.includes(token) || tagsLower.includes(token)) score += 10;
         if (contentLower.includes(token)) score += 5;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
       }
 
       return { article: a, score };
@@ -455,6 +521,13 @@ const handlePublish = (req, res) => {
     const { title, summary, content, categoryId, authorName, authorUrl, imageUrl, sourceType, tags } = req.body;
     if (!title || !content) {
       return res.status(400).json({ success: false, error: 'Title and content are required' });
+
+
+
+
+
+
+
     }
 
     const now = new Date();
@@ -518,6 +591,7 @@ const handlePublish = (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
+
   }
 };
 

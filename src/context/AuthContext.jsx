@@ -1,198 +1,219 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { account, isConfigured } from '../services/appwriteClient';
+import { ID } from 'appwrite';
+import { account, databases, isConfigured } from '../services/appwriteClient';
+import { APP_CONFIG } from '../config/appConfig';
 import { USER_ROLES } from '../constants/categories';
 
 const AuthContext = createContext(null);
 const LOCAL_USER_KEY = 'newsaxis_auth_user';
+const PROFILES_COLLECTION = APP_CONFIG.appwrite.collections.profiles;
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  // pendingAuth holds state while an OTP challenge is in flight
+  // { userId, email, name, role, mode: 'signup' | 'login' }
+  const [pendingAuth, setPendingAuth] = useState(null);
 
-  // Initialize session on mount
   useEffect(() => {
     async function checkSession() {
-      if (isConfigured) {
-        try {
-          const currentAccount = await account.get();
-          setUser({
-            id: currentAccount.$id,
-            email: currentAccount.email,
-            name: currentAccount.name,
-            username: currentAccount.name.toLowerCase().replace(/\s+/g, ''),
-            role: USER_ROLES.AUTHOR
-          });
-        } catch {
-          loadLocalUser();
-        }
-      } else {
-        loadLocalUser();
-      }
-      setLoading(false);
-    }
-
-    function loadLocalUser() {
+      // Never let a failed/misconfigured Appwrite call crash the app render —
+      // always fall back to "logged out" instead of throwing.
       try {
-        const saved = localStorage.getItem(LOCAL_USER_KEY);
-        if (saved) {
-          setUser(JSON.parse(saved));
+        if (isConfigured) {
+          try {
+            const currentAccount = await account.get();
+            const profile = await loadProfile(currentAccount.$id, currentAccount);
+            setUser(profile);
+          } catch {
+            setUser(null);
+          }
         } else {
-          // Default state: unauthenticated visitor (no demo auto-login)
-          setUser(null);
+          const saved = localStorage.getItem(LOCAL_USER_KEY);
+          if (saved) setUser(JSON.parse(saved));
         }
       } catch (err) {
-        console.warn('Local user loading error', err);
+        console.warn('Session check failed, continuing as logged out:', err?.message || err);
         setUser(null);
+      } finally {
+        setLoading(false);
       }
     }
-
-
     checkSession();
   }, []);
 
-  const login = async (email, password) => {
-    if (isConfigured) {
-      try {
-        // Clear any lingering session before creating a new one to avoid 401/409 session conflicts
-        await account.deleteSession('current').catch(() => null);
-      } catch (e) {
-        // Ignore session clearing errors
-      }
-      await account.createEmailPasswordSession(email, password);
-      const acc = await account.get();
-      const u = {
-        id: acc.$id,
-        email: acc.email,
-        name: acc.name || email.split('@')[0],
-        username: (acc.name || email.split('@')[0]).toLowerCase().replace(/\s+/g, ''),
-        role: USER_ROLES.AUTHOR
+  async function loadProfile(userId, accountDoc) {
+    let profile = null;
+    try {
+      profile = await databases.getDocument(
+        APP_CONFIG.appwrite.databaseId,
+        PROFILES_COLLECTION || 'profiles',
+        userId
+      );
+    } catch {
+      // Profile doc missing (e.g. first login) — reconstruct minimal profile
+      profile = {
+        userId,
+        name: accountDoc?.name || 'User',
+        email: accountDoc?.email || '',
+        role: USER_ROLES.READER
       };
-      setUser(u);
-      localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(u));
-      return u;
-    } else {
-      // Local session for development & testing
-      const u = {
-        id: `usr_${Date.now()}`,
-        email,
-        name: email.split('@')[0],
-        username: email.split('@')[0].toLowerCase(),
-        role: email.includes('admin') ? USER_ROLES.ADMIN : USER_ROLES.AUTHOR,
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80'
-      };
-      setUser(u);
-      localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(u));
-      return u;
     }
-  };
-
-  const signup = async (email, password, name, role = USER_ROLES.READER) => {
-    if (isConfigured) {
-      await account.create('unique()', email, password, name);
-      const u = await login(email, password);
-      // Persist chosen role
-      const userWithRole = { ...u, role };
-      setUser(userWithRole);
-      localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(userWithRole));
-      return userWithRole;
-    } else {
-      const u = {
-        id: `usr_${Date.now()}`,
-        email,
-        name,
-        username: name.toLowerCase().replace(/\s+/g, ''),
-        role: role || USER_ROLES.READER,
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80'
-      };
-      setUser(u);
-      localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(u));
-      return u;
-    }
-  };
-
-  const updateUserRole = (newRole) => {
-    if (!user) return;
-    const updated = { ...user, role: newRole };
-    setUser(updated);
-    localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(updated));
-    return updated;
-  };
-
-  const quickDemoLogin = (role = 'author') => {
     const u = {
-      id: `usr_${Date.now()}`,
-      email: role === 'admin' ? 'director@newsaxis.media' : (role === 'author' ? 'contributor@newsaxis.media' : 'reader@newsaxis.media'),
-      name: role === 'admin' ? 'Editorial Director' : (role === 'author' ? 'Staff Writer' : 'Daily Reader'),
-      username: role === 'admin' ? 'director' : (role === 'author' ? 'staff_writer' : 'reader'),
-      role: role === 'admin' ? USER_ROLES.ADMIN : (role === 'author' ? USER_ROLES.AUTHOR : USER_ROLES.READER),
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'
+      id: userId,
+      email: profile.email || accountDoc?.email,
+      name: profile.name || accountDoc?.name,
+      username: (profile.name || accountDoc?.name || 'user').toLowerCase().replace(/\s+/g, ''),
+      role: profile.role || USER_ROLES.READER
     };
-    setUser(u);
     localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(u));
     return u;
-  };
+  }
 
-  const fallbackGoogleLogin = () => {
-    const u = {
-      id: `google_${Date.now()}`,
-      email: 'reader@gmail.com',
-      name: 'Google Reader',
-      username: 'googlereader',
-      role: USER_ROLES.AUTHOR,
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80',
-      provider: 'google'
-    };
-    setUser(u);
-    localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(u));
-    return u;
-  };
+  function validateEmail(email) {
+    return EMAIL_RE.test(String(email || '').trim());
+  }
 
-  const loginWithGoogle = async () => {
-    if (isConfigured) {
-      try {
-        await account.createOAuth2Session(
-          'google',
-          `${window.location.origin}/`,
-          `${window.location.origin}/login`
-        );
-      } catch (err) {
-        console.warn('Appwrite Google OAuth failed, using local Google session', err);
-        return fallbackGoogleLogin();
-      }
-    } else {
-      return fallbackGoogleLogin();
+  /**
+   * Step 1 of signup: validate input, check for an existing account with this
+   * email, create the Appwrite account (email+password, securely hashed by
+   * Appwrite — never stored in plaintext by our code), write a profile
+   * document, then send a 6-digit email OTP. Nothing is "logged in" yet —
+   * verifyOtp() must succeed first.
+   */
+  const startSignup = async ({ name, email, password, role }) => {
+    if (!validateEmail(email)) {
+      throw new Error('Please enter a valid email address.');
     }
+    if (!name?.trim()) throw new Error('Please enter your name.');
+    if (!password || password.length < 8) {
+      throw new Error('Password must be at least 8 characters long.');
+    }
+    if (!isConfigured) {
+      throw new Error('Appwrite is not configured. Cannot create a real account in this environment.');
+    }
+
+    const userId = ID.unique();
+    try {
+      await account.create(userId, email.trim(), password, name.trim());
+    } catch (err) {
+      if (err?.code === 409 || /already exists/i.test(err?.message || '')) {
+        throw new Error('An account with this email already exists. Please sign in instead.');
+      }
+      throw err;
+    }
+
+    // Persist profile (role, name) keyed by the new userId
+    try {
+      await databases.createDocument(
+        APP_CONFIG.appwrite.databaseId,
+        PROFILES_COLLECTION,
+        userId,
+        {
+          userId,
+          name: name.trim(),
+          username: name.trim().toLowerCase().replace(/\s+/g, ''),
+          email: email.trim(),
+          role: role || USER_ROLES.READER
+        }
+      );
+    } catch (err) {
+      console.warn('Profile document creation failed (continuing):', err.message);
+    }
+
+    // Send OTP to the registered email
+    const token = await account.createEmailToken(userId, email.trim());
+    setPendingAuth({ userId: token.userId, email: email.trim(), name: name.trim(), role, mode: 'signup' });
+    return { userId: token.userId };
   };
+
+  /**
+   * Step 1 of login: verify the email belongs to an existing account
+   * (Appwrite errors if not) and send a fresh OTP.
+   */
+  const startLogin = async (email) => {
+    if (!validateEmail(email)) {
+      throw new Error('Please enter a valid email address.');
+    }
+    if (!isConfigured) {
+      throw new Error('Appwrite is not configured. Cannot authenticate in this environment.');
+    }
+    // createEmailToken both identifies the user by email and sends the OTP.
+    // Appwrite returns a generic error for unknown emails to avoid user enumeration,
+    // but will still fail cleanly for the login flow.
+    const token = await account.createEmailToken(ID.unique(), email.trim());
+    setPendingAuth({ userId: token.userId, email: email.trim(), mode: 'login' });
+    return { userId: token.userId };
+  };
+
+  /**
+   * Step 2: verify the 6-digit OTP and establish the session.
+   */
+  const verifyOtp = async (code) => {
+    if (!pendingAuth) throw new Error('No pending verification. Please start again.');
+    if (!/^\d{6}$/.test(code || '')) throw new Error('Enter the 6-digit code sent to your email.');
+
+    await account.createSession(pendingAuth.userId, code);
+    const currentAccount = await account.get();
+    const profile = await loadProfile(currentAccount.$id, currentAccount);
+    setUser(profile);
+    setPendingAuth(null);
+    return profile;
+  };
+
+  const resendOtp = async () => {
+    if (!pendingAuth) throw new Error('No pending verification.');
+    const token = await account.createEmailToken(pendingAuth.userId, pendingAuth.email);
+    setPendingAuth(prev => ({ ...prev, userId: token.userId }));
+  };
+
+  const cancelPendingAuth = () => setPendingAuth(null);
 
   const logout = async () => {
     if (isConfigured) {
       try {
         await account.deleteSession('current');
       } catch (e) {
-        console.warn('Appwrite logout session deletion', e);
+        // ignore
       }
     }
     setUser(null);
     localStorage.removeItem(LOCAL_USER_KEY);
   };
 
-  const switchRole = (newRole) => {
+  const switchRole = async (newRole) => {
     if (!user) return;
     const updated = { ...user, role: newRole };
     setUser(updated);
     localStorage.setItem(LOCAL_USER_KEY, JSON.stringify(updated));
+    if (isConfigured) {
+      try {
+        await databases.updateDocument(
+          APP_CONFIG.appwrite.databaseId,
+          PROFILES_COLLECTION,
+          user.id,
+          { role: newRole }
+        );
+      } catch (e) {
+        console.warn('Role update sync failed', e);
+      }
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      loading, 
-      login, 
-      signup, 
-      loginWithGoogle, 
-      quickDemoLogin, 
-      logout, 
-      switchRole, 
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      pendingAuth,
+      startSignup,
+      startLogin,
+      verifyOtp,
+      resendOtp,
+      cancelPendingAuth,
+      logout,
+      switchRole,
       isAuthenticated: Boolean(user),
       isAppwriteConfigured: isConfigured
     }}>
