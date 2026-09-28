@@ -1,5 +1,6 @@
 import { BaseProvider } from './baseProvider';
 import { normalizeArticle } from '../utils/normalizeArticle';
+import { getDynamicArticleImage } from '../utils/dynamicImage';
 
 /**
  * DEV.to / Forem API Provider (Live public developer articles)
@@ -66,7 +67,7 @@ export class DevToProvider extends BaseProvider {
       title: raw.title,
       summary: raw.description,
       content: raw.body_markdown || raw.description,
-      imageUrl: raw.cover_image || raw.social_image || 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=1200&auto=format&fit=crop&q=80',
+      imageUrl: raw.cover_image || raw.social_image || getDynamicArticleImage(raw.title, 'programming', String(raw.id)),
       sourceName: 'DEV Community',
       sourceUrl: raw.url,
       authorName: raw.user?.name || 'DEV Author',

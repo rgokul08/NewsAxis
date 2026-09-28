@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Bookmark, Clock, Flame, ExternalLink, Sparkles } from 'lucide-react';
 import { articleService } from '../../services/articleService';
 import { formatISTShort } from '../../utils/istDate';
+import { getDynamicArticleImage } from '../../utils/dynamicImage';
 
 export function ArticleCard({ article, compact = false, showExpiration = true, lead = false }) {
   const [isBookmarked, setIsBookmarked] = useState(() => articleService.isBookmarked(article?.id));
@@ -97,7 +98,7 @@ export function ArticleCard({ article, compact = false, showExpiration = true, l
               {article.categorySlug || 'LEAD REPORT'}
             </span>
             {isDevBlog && (
-              <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[10px] font-bold px-1.5 py-0.5 rounded">
+              <span className="bg-[#a91b0d]/10 text-[#a91b0d] dark:bg-rose-950/60 dark:text-rose-300 border border-[#a91b0d]/20 text-[10px] font-bold px-1.5 py-0.5 rounded">
                 DEV BLOG
               </span>
             )}
@@ -122,16 +123,17 @@ export function ArticleCard({ article, compact = false, showExpiration = true, l
           </h2>
         </Link>
 
-        {article.imageUrl && (
-          <Link to={articleLink} className="block aspect-[16/10] overflow-hidden bg-slate-100 dark:bg-slate-800 rounded-sm my-3 shadow-xs">
-            <img
-              src={article.imageUrl}
-              alt={article.title}
-              className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
-              onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=1000&q=80'; }}
-            />
-          </Link>
-        )}
+        <Link to={articleLink} className="block aspect-[16/10] overflow-hidden bg-slate-100 dark:bg-slate-800 rounded-sm my-3 shadow-xs">
+          <img
+            src={article.imageUrl || getDynamicArticleImage(article.title, article.categorySlug || article.categoryId, article.id)}
+            alt={article.title}
+            className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = getDynamicArticleImage(article.title, article.categorySlug || article.categoryId, article.id + '_lead');
+            }}
+          />
+        </Link>
 
         <p className="font-body-serif text-sm sm:text-base text-[#374151] dark:text-[#c9d1d9] leading-relaxed line-clamp-3">
           {article.summary || article.excerpt}
@@ -158,17 +160,18 @@ export function ArticleCard({ article, compact = false, showExpiration = true, l
   return (
     <article className="group flex flex-col justify-between h-full pb-4 border-b border-[#e5e7eb] dark:border-[#30363d] hover:bg-slate-50/40 dark:hover:bg-slate-900/30 p-2 -m-2 rounded transition-all">
       <div className="space-y-2">
-        {article.imageUrl && (
-          <Link to={articleLink} className="block aspect-[16/10] w-full overflow-hidden bg-slate-100 dark:bg-slate-800 rounded-sm mb-2 shadow-2xs">
-            <img
-              src={article.imageUrl}
-              alt={article.title}
-              loading="lazy"
-              className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
-              onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=600&q=80'; }}
-            />
-          </Link>
-        )}
+        <Link to={articleLink} className="block aspect-[16/10] w-full overflow-hidden bg-slate-100 dark:bg-slate-800 rounded-sm mb-2 shadow-2xs">
+          <img
+            src={article.imageUrl || getDynamicArticleImage(article.title, article.categorySlug || article.categoryId, article.id)}
+            alt={article.title}
+            loading="lazy"
+            className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = getDynamicArticleImage(article.title, article.categorySlug || article.categoryId, article.id + '_card');
+            }}
+          />
+        </Link>
 
         <div className="flex items-center justify-between text-[11px] font-sans-clean">
           <div className="flex items-center gap-1.5">
@@ -176,7 +179,7 @@ export function ArticleCard({ article, compact = false, showExpiration = true, l
               {article.categorySlug || article.categoryId || 'NEWS'}
             </span>
             {isDevBlog && (
-              <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-[9px] font-bold px-1.5 py-0.2 rounded">
+              <span className="bg-[#a91b0d]/10 text-[#a91b0d] dark:bg-rose-950/60 dark:text-rose-300 border border-[#a91b0d]/20 text-[9px] font-bold px-1.5 py-0.2 rounded">
                 BLOG
               </span>
             )}

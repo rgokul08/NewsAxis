@@ -9,6 +9,7 @@ import DOMPurify from 'dompurify';
 import { articleService } from '../services/articleService';
 import { Badge, Button } from '../components/common/UIComponents';
 import { ArticleCard } from '../components/article/ArticleCard';
+import { getDynamicArticleImage } from '../utils/dynamicImage';
 
 /**
  * UNIFIED ARTICLE TEMPLATE
@@ -204,7 +205,7 @@ export function ArticlePage() {
             </span>
             {article.isBreaking && <Badge variant="breaking">Breaking News</Badge>}
             {article.sourceType === 'external_blog' && (
-              <span className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-xs font-bold px-2 py-0.5 rounded">
+              <span className="bg-[#a91b0d]/10 text-[#a91b0d] dark:bg-rose-950/60 dark:text-rose-300 border border-[#a91b0d]/20 text-xs font-bold px-2 py-0.5 rounded">
                 Tech Blog
               </span>
             )}
@@ -293,10 +294,13 @@ export function ArticlePage() {
 
         <div className="aspect-video w-full rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-800 shadow-md">
           <img
-            src={article.imageUrl}
+            src={article.imageUrl || getDynamicArticleImage(article.title, article.categorySlug || article.categoryId, article.id)}
             alt={article.imageAlt || article.title}
             className="w-full h-full object-cover"
-            onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200&q=80'; }}
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = getDynamicArticleImage(article.title, article.categorySlug || article.categoryId, article.id + '_article');
+            }}
           />
         </div>
 

@@ -1,5 +1,6 @@
 import { BaseProvider } from './baseProvider';
 import { normalizeArticle } from '../utils/normalizeArticle';
+import { getDynamicArticleImage } from '../utils/dynamicImage';
 
 /**
  * Hashnode GraphQL Provider (Technology, AI, and Software Engineering)
@@ -76,7 +77,7 @@ export class HashnodeProvider extends BaseProvider {
       contentType: 'blog',
       title: raw.title,
       summary: raw.brief,
-      imageUrl: raw.coverImage?.url || 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=1200&auto=format&fit=crop&q=80',
+      imageUrl: raw.coverImage?.url || getDynamicArticleImage(raw.title, 'technology', String(raw.id)),
       sourceName: 'Hashnode',
       sourceUrl: raw.url,
       authorName: raw.author?.name || 'Hashnode Writer',

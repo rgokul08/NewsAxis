@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Clock, Bookmark, Share2, ArrowRight } from 'lucide-react';
 import { Badge } from '../common/UIComponents';
 import { articleService } from '../../services/articleService';
+import { getDynamicArticleImage } from '../../utils/dynamicImage';
 
 export function HeroStory({ article }) {
   if (!article) return null;
@@ -63,10 +64,13 @@ export function HeroStory({ article }) {
         {/* Right High-Impact Cover Image */}
         <div className="lg:col-span-6 relative h-64 lg:h-auto overflow-hidden">
           <img
-            src={article.imageUrl}
+            src={article.imageUrl || getDynamicArticleImage(article.title, article.categorySlug || article.categoryId, article.id)}
             alt={article.title}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-            onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200&q=80'; }}
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = getDynamicArticleImage(article.title, article.categorySlug || article.categoryId, article.id + '_hero');
+            }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 lg:hidden" />
         </div>

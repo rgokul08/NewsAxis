@@ -3,6 +3,7 @@ import { databases, isConfigured } from './appwriteClient';
 import { APP_CONFIG } from '../config/appConfig';
 import { calculateTrendingScore, deduplicateArticles } from '../utils/normalizeArticle';
 import { formatIST } from '../utils/istDate';
+import { getDynamicArticleImage } from '../utils/dynamicImage';
 
 const ARTICLES_COLLECTION = APP_CONFIG.appwrite.collections.articles;
 const LOCAL_STORAGE_BOOKMARKS_KEY = 'newsaxis_local_bookmarks';
@@ -37,7 +38,7 @@ class ArticleService {
       summary: doc.summary || doc.description || '',
       description: doc.description || doc.summary || '',
       content: doc.content || doc.summary || '',
-      imageUrl: doc.imageUrl || '',
+      imageUrl: doc.imageUrl || getDynamicArticleImage(doc.title, doc.categoryId || doc.category || 'world', doc.$id || doc.id),
       sourceName: doc.sourceName || doc.source || 'NewsAxis',
       sourceUrl: doc.sourceUrl || doc.url || '',
       url: doc.sourceUrl || doc.url || '',

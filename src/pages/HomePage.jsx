@@ -179,7 +179,7 @@ export function HomePage() {
               LIVE TV
             </button>
             <span>/</span>
-            <Link to="/blogs" className="text-emerald-600 dark:text-emerald-400 hover:underline">DEV BLOGS</Link>
+            <Link to="/blogs" className="text-[#a91b0d] dark:text-rose-400 hover:underline">DEV BLOGS</Link>
             <span>/</span>
             <Link to="/category/technology" className="hover:underline">TECH & AI</Link>
           </div>
@@ -394,30 +394,30 @@ export function HomePage() {
             </section>
 
             {/* 3. DEDICATED REAL-WORLD DEVELOPER BLOGS SECTION */}
-            <section className="bg-slate-900 text-white rounded-lg p-6 sm:p-7 space-y-5 border border-slate-800 shadow-md">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+            <section className="space-y-4 pt-3 pb-6 border-b border-[#e5e7eb] dark:border-[#30363d] bg-slate-50/50 dark:bg-[#161b22]/40 p-4 sm:p-6 rounded-lg">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b-2 border-[#111827] dark:border-[#30363d] pb-2.5 gap-3">
                 <div className="flex items-center gap-2.5">
-                  <span className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400">
-                    <Code2 className="w-5 h-5" />
+                  <span className="p-1.5 rounded-full bg-rose-50 dark:bg-rose-950/40 text-[#a91b0d] dark:text-rose-400">
+                    <Code2 className="w-4 h-4" />
                   </span>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="font-headline text-2xl font-black text-white">
+                      <h3 className="font-headline text-xl sm:text-2xl font-black text-[#111827] dark:text-white leading-tight">
                         Developer & Tech Blogs
                       </h3>
-                      <span className="bg-emerald-500 text-slate-950 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider font-sans-clean">
+                      <span className="bg-[#a91b0d]/10 dark:bg-rose-950/60 text-[#a91b0d] dark:text-rose-300 border border-[#a91b0d]/20 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider font-sans-clean">
                         Real-World API
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400 font-sans-clean mt-0.5">
-                      Live posts streamed from <strong>DEV Community</strong>, <strong>Medium Tech</strong>, & <strong>Hacker News</strong>
+                    <p className="text-[11px] font-sans-clean text-slate-500 dark:text-slate-400 mt-0.5">
+                      Live dispatches streamed from <strong>DEV Community</strong>, <strong>Medium Tech</strong>, & <strong>Hacker News</strong>
                     </p>
                   </div>
                 </div>
 
                 <Link
                   to="/blogs"
-                  className="inline-flex items-center gap-1.5 text-xs font-sans-clean font-bold text-emerald-400 hover:text-emerald-300 transition-colors"
+                  className="inline-flex items-center gap-1.5 text-xs font-sans-clean font-bold text-[#a91b0d] dark:text-rose-400 hover:underline transition-colors"
                 >
                   <span>Explore All Blogs</span>
                   <ArrowRight className="w-3.5 h-3.5" />

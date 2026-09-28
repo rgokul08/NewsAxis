@@ -4,36 +4,10 @@
  * Strictly uses real-world data only (NO demo/mock data).
  */
 import crypto from 'node:crypto';
+import { getDynamicArticleImage, extractImageFromXml } from '../src/utils/dynamicImage.js';
 
-// Category default fallback images (high-res Unsplash curated)
-const CATEGORY_IMAGES = {
-  world: 'https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?w=1200&auto=format&fit=crop&q=80',
-  technology: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&auto=format&fit=crop&q=80',
-  programming: 'https://images.unsplash.com/photo-1555066931-4365d14bab8c?w=1200&auto=format&fit=crop&q=80',
-  business: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1200&auto=format&fit=crop&q=80',
-  economy: 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1200&auto=format&fit=crop&q=80',
-  markets: 'https://images.unsplash.com/photo-1642543492481-44e81e3914a7?w=1200&auto=format&fit=crop&q=80',
-  trade: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=1200&auto=format&fit=crop&q=80',
-  politics: 'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=1200&auto=format&fit=crop&q=80',
-  startups: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200&auto=format&fit=crop&q=80',
-  science: 'https://images.unsplash.com/photo-1507668077129-56e32842fceb?w=1200&auto=format&fit=crop&q=80',
-  health: 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=1200&auto=format&fit=crop&q=80',
-  education: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=1200&auto=format&fit=crop&q=80',
-  entertainment: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1200&auto=format&fit=crop&q=80',
-  sports: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=1200&auto=format&fit=crop&q=80',
-  india: 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=1200&auto=format&fit=crop&q=80',
-  lifestyle: 'https://images.unsplash.com/photo-1511988617509-a57c8a288659?w=1200&auto=format&fit=crop&q=80',
-  travel: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1200&auto=format&fit=crop&q=80',
-  environment: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&auto=format&fit=crop&q=80',
-  weather: 'https://images.unsplash.com/photo-1534088568595-a066f410bcda?w=1200&auto=format&fit=crop&q=80',
-  finance: 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=1200&auto=format&fit=crop&q=80',
-  automobile: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=1200&auto=format&fit=crop&q=80',
-  agriculture: 'https://images.unsplash.com/photo-1500937386664-56d1dfef3854?w=1200&auto=format&fit=crop&q=80',
-  crime: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1200&auto=format&fit=crop&q=80',
-  opinion: 'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=1200&auto=format&fit=crop&q=80',
-  breaking: 'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=1200&auto=format&fit=crop&q=80',
-  default: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200&auto=format&fit=crop&q=80'
-};
+export { getDynamicArticleImage };
+
 
 const FEEDS = [
   // 1. Breaking News Feeds
@@ -439,18 +413,10 @@ function parseRssXml(xml, feedConfig) {
     const pubDateStr = getTag('pubDate') || getTag('dc:date') || new Date().toISOString();
     const author = getTag('dc:creator') || getTag('author') || feedConfig.name;
 
-    // Image extraction
-    let imageUrl = getAttr('media:content', 'url') || 
-                   getAttr('media:thumbnail', 'url') || 
-                   getAttr('enclosure', 'url');
-
+    // Dynamic Image extraction
+    let imageUrl = extractImageFromXml(itemXml);
     if (!imageUrl) {
-      const imgMatch = itemXml.match(/<img[^>]+src=["']([^"']+)["']/i);
-      if (imgMatch) imageUrl = imgMatch[1];
-    }
-
-    if (!imageUrl || imageUrl.includes('feedburner') || imageUrl.includes('1x1')) {
-      imageUrl = CATEGORY_IMAGES[feedConfig.category] || CATEGORY_IMAGES.default;
+      imageUrl = getDynamicArticleImage(title, feedConfig.category, link || title);
     }
 
     if (title && (link || description)) {
@@ -521,7 +487,7 @@ async function fetchDevToBlogs() {
       content: a.readable_publish_date ? `${a.description}\n\nTags: ${a.tag_list?.join(', ')}` : a.description,
       pubDate: a.published_at || new Date().toISOString(),
       author: a.user?.name || 'DEV Contributor',
-      imageUrl: a.cover_image || a.social_image || CATEGORY_IMAGES.programming,
+      imageUrl: a.cover_image || a.social_image || getDynamicArticleImage(a.title, 'programming', a.url || String(a.id)),
       category: 'programming',
       feedId: 'dev_to',
       feedName: 'DEV Community',
@@ -568,7 +534,7 @@ async function fetchHackerNews() {
       content: `Hacker News discussion: ${s.title}. Read the full article at the source URL.`,
       pubDate: new Date((s.time || Date.now() / 1000) * 1000).toISOString(),
       author: s.by || 'HackerNews',
-      imageUrl: CATEGORY_IMAGES.technology,
+      imageUrl: getDynamicArticleImage(s.title, 'technology', s.url || String(s.id)),
       category: 'technology',
       feedId: 'hacker_news',
       feedName: 'Hacker News',
@@ -599,7 +565,7 @@ async function fetchGNews() {
       content: a.content || a.description || '',
       pubDate: a.publishedAt || new Date().toISOString(),
       author: a.source?.name || 'GNews',
-      imageUrl: a.image || CATEGORY_IMAGES.world,
+      imageUrl: a.image || getDynamicArticleImage(a.title, 'world', a.url),
       category: 'world',
       feedId: 'gnews',
       feedName: a.source?.name || 'GNews Verified',
@@ -628,7 +594,7 @@ async function fetchNewsData() {
       content: a.content || a.description || '',
       pubDate: a.pubDate || new Date().toISOString(),
       author: (a.creator && a.creator[0]) || a.source_id || 'NewsData.io',
-      imageUrl: a.image_url || CATEGORY_IMAGES.world,
+      imageUrl: a.image_url || getDynamicArticleImage(a.title, (a.category && a.category[0]) || 'world', a.link),
       category: (a.category && a.category[0]) || 'world',
       feedId: 'newsdata',
       feedName: a.source_id ? `${a.source_id.toUpperCase()} (NewsData)` : 'NewsData Live',
@@ -657,7 +623,7 @@ async function fetchNewsApiOrg() {
       content: a.content || a.description || '',
       pubDate: a.publishedAt || new Date().toISOString(),
       author: a.author || a.source?.name || 'NewsAPI',
-      imageUrl: a.urlToImage || CATEGORY_IMAGES.world,
+      imageUrl: a.urlToImage || getDynamicArticleImage(a.title, 'world', a.url),
       category: 'world',
       feedId: 'newsapi_org',
       feedName: a.source?.name || 'NewsAPI Global',
@@ -686,7 +652,7 @@ async function fetchTheNewsApi() {
       content: a.description || a.snippet || '',
       pubDate: a.published_at || new Date().toISOString(),
       author: a.source || 'TheNewsAPI',
-      imageUrl: a.image_url || CATEGORY_IMAGES.world,
+      imageUrl: a.image_url || getDynamicArticleImage(a.title, (a.categories && a.categories[0]) || 'world', a.url),
       category: (a.categories && a.categories[0]) || 'world',
       feedId: 'thenewsapi',
       feedName: a.source || 'TheNewsAPI',
@@ -715,7 +681,7 @@ async function fetchMediaStack() {
       content: a.description || '',
       pubDate: a.published_at || new Date().toISOString(),
       author: a.author || a.source || 'Mediastack Live',
-      imageUrl: a.image || CATEGORY_IMAGES.world,
+      imageUrl: a.image || getDynamicArticleImage(a.title, a.category || 'world', a.url),
       category: a.category || 'world',
       feedId: 'mediastack',
       feedName: a.source || 'Mediastack Verified',
@@ -805,8 +771,8 @@ export async function aggregateRealWorldContent(retentionMinutes = 30) {
       summary: (item.description || '').slice(0, 2000),
       description: (item.description || '').slice(0, 2000),
       content: (item.content || item.description || '').slice(0, 10000),
-      imageUrl: item.imageUrl || CATEGORY_IMAGES[inferredCat] || CATEGORY_IMAGES.default,
-      image_url: item.imageUrl || CATEGORY_IMAGES[inferredCat] || CATEGORY_IMAGES.default,
+      imageUrl: item.imageUrl || getDynamicArticleImage(item.title, inferredCat, articleId),
+      image_url: item.imageUrl || getDynamicArticleImage(item.title, inferredCat, articleId),
       source: item.feedName || 'NewsAxis',
       sourceName: item.feedName || 'NewsAxis',
       source_name: item.feedName || 'NewsAxis',

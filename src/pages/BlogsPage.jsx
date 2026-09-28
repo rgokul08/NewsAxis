@@ -37,10 +37,10 @@ export function BlogsPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-xs uppercase font-bold tracking-widest text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+            <span className="text-xs uppercase font-bold tracking-widest text-[#a91b0d] dark:text-rose-400 flex items-center gap-1">
               <Code2 className="w-3.5 h-3.5" /> Real-World Engineering & Tech Blogs
             </span>
-            <span className="bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded">
+            <span className="bg-[#a91b0d]/10 dark:bg-rose-950 text-[#a91b0d] dark:text-rose-300 border border-[#a91b0d]/20 text-[10px] font-bold px-2 py-0.5 rounded">
               30-MIN CYCLE
             </span>
           </div>
@@ -72,7 +72,7 @@ export function BlogsPage() {
             onClick={() => setFilter(tab.id)}
             className={`px-3 py-1.5 rounded-full transition-colors cursor-pointer ${
               filter === tab.id
-                ? 'bg-emerald-600 text-white font-bold'
+                ? 'bg-[#a91b0d] text-white font-bold'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
             }`}
           >
@@ -96,7 +96,7 @@ export function BlogsPage() {
         </div>
       ) : (
         <div className="text-center py-20 space-y-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-dashed border-slate-200 dark:border-slate-800">
-          <Flame className="w-10 h-10 text-emerald-500 mx-auto" />
+          <Flame className="w-10 h-10 text-[#a91b0d] dark:text-rose-400 mx-auto" />
           <p className="text-lg font-bold text-slate-700 dark:text-slate-300">No blogs currently in this category</p>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
             New blogs are fetched continuously from real-world APIs and updated every 30 minutes.
