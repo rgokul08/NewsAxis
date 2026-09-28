@@ -1,4 +1,5 @@
 import { Client, Databases, Storage, ID, Query } from 'node-appwrite';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,18 +37,18 @@ let storage = null;
 let isConfigured = false;
 let resolvedEndpoint = 'https://cloud.appwrite.io/v1';
 let projectId = '';
-let databaseId = '6ab613fc0006b9fedac1';
-let bucketId = '6ab614cc0022aa43fab8';
+let databaseId = 'newsaxis-main';
+let bucketId = 'newsaxis-media';
+let lastSyncError = null;
 
 export function getAppwriteClient() {
-  if (client) return { client, databases, storage, isConfigured };
+  if (client) return { client, databases, storage, isConfigured, databaseId, bucketId };
 
-  projectId = process.env.APPWRITE_PROJECT_ID || process.env.VITE_APPWRITE_PROJECT_ID || '6a854c5d0026a9224d01';
-  const apiKey = process.env.APPWRITE_API_KEY || 'standard_8d908df942748395872387098595c63acf0c28d30f846fb749285c398d63595a6e3362097e8d7870c13ee7fcfae4f1e8fbdded73e5afb31dc5cd3c9a409696f4439bb4040cf0c426a1d5411361745933485d020a42071d677e23f95a72bc9e6f88ea42cbe60883c8fdf477595a0595a83394cb2cf5d3d0aeb65688bb8b71a3eb';
-  databaseId = process.env.APPWRITE_DATABASE_ID || process.env.VITE_APPWRITE_DATABASE_ID || '6ab613fc0006b9fedac1';
-  bucketId = process.env.APPWRITE_BUCKET_ID || process.env.VITE_APPWRITE_BUCKET_ID || '6ab614cc0022aa43fab8';
+  projectId = process.env.APPWRITE_PROJECT_ID || process.env.VITE_APPWRITE_PROJECT_ID;
+  const apiKey = process.env.APPWRITE_API_KEY;
+  databaseId = process.env.APPWRITE_DATABASE_ID || process.env.VITE_APPWRITE_DATABASE_ID || 'newsaxis-main';
+  bucketId = process.env.APPWRITE_BUCKET_ID || process.env.VITE_APPWRITE_BUCKET_ID || 'newsaxis-media';
   
-  // Use SGP region for this project
   const envEndpoint = process.env.APPWRITE_ENDPOINT || process.env.VITE_APPWRITE_ENDPOINT;
   resolvedEndpoint = envEndpoint && !envEndpoint.includes('cloud.appwrite.io/v1') 
     ? envEndpoint 
@@ -70,163 +71,212 @@ export function getAppwriteClient() {
     }
   }
 
-  return { client, databases, storage, isConfigured };
+  return { client, databases, storage, isConfigured, databaseId, bucketId };
 }
 
 // Auto-initialize
 getAppwriteClient();
 
-const ARTICLES_COLLECTION_ID = 'articles';
+export const ARTICLES_COLLECTION_ID = 'articles';
+
+/**
+ * Generate a safe 36-char Appwrite Document ID
+ * Format: "art_" + 32-hex-char md5 of URL/ID
+ * Guaranteed to start with 'a' and only contain [a-z0-9_], max 36 chars.
+ */
+export function getSafeDocId(article) {
+  const seed = article.sourceUrl || article.url || article.link || article.id || article.title;
+  const hash = crypto.createHash('md5').update(String(seed)).digest('hex');
+  return `art_${hash}`;
+}
+
+/**
+ * Normalizes article data to conform with Appwrite attributes
+ */
+export function formatArticleForAppwrite(art) {
+  return {
+    title: (art.title || '').slice(0, 500),
+    slug: (art.slug || '').slice(0, 255),
+    description: (art.description || art.summary || '').slice(0, 2000),
+    summary: (art.summary || art.description || '').slice(0, 2000),
+    content: (art.content || art.summary || art.description || '').slice(0, 10000),
+    imageUrl: (art.imageUrl || art.image_url || '').slice(0, 1000),
+    source: (art.source || art.sourceName || 'NewsAxis').slice(0, 150),
+    sourceName: (art.sourceName || art.source || 'NewsAxis').slice(0, 150),
+    sourceUrl: (art.sourceUrl || art.url || '').slice(0, 1000),
+    url: (art.sourceUrl || art.url || '').slice(0, 1000),
+    author: (art.author || art.authorName || 'Staff').slice(0, 150),
+    authorName: (art.authorName || art.author || 'Staff').slice(0, 150),
+    authorId: (art.authorId || '').slice(0, 100),
+    category: (art.category || art.categoryId || 'world').slice(0, 100),
+    categoryId: (art.categoryId || art.category || 'world').slice(0, 100),
+    provider: (art.provider || art.providerId || 'rss').slice(0, 100),
+    language: (art.language || 'en').slice(0, 20),
+    contentType: (art.contentType || 'news').slice(0, 50),
+    sourceType: (art.sourceType || 'external_news').slice(0, 50),
+    publishedAt: art.publishedAt || art.published_at || new Date().toISOString(),
+    createdAt: art.createdAt || new Date().toISOString(),
+    expiresAt: art.expiresAt || new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    isBreaking: Boolean(art.isBreaking),
+    isFeatured: Boolean(art.isFeatured),
+    views: Number(art.views || 1),
+    readingTime: Number(art.readingTime || 3)
+  };
+}
 
 /**
  * Sync fresh articles to Appwrite Database
  */
 export async function syncArticlesToAppwrite(articles = [], batchId = '') {
-  const { databases, isConfigured } = getAppwriteClient();
+  const { databases, isConfigured, databaseId } = getAppwriteClient();
   if (!isConfigured || !databases) {
-    return { success: false, reason: 'Appwrite not configured with API key' };
+    const msg = 'Appwrite not configured or missing APPWRITE_API_KEY';
+    console.warn(`[Appwrite Sync] ${msg}`);
+    return { success: false, reason: msg };
   }
 
   console.log(`[Appwrite] Syncing ${articles.length} real-world articles to Appwrite database (${databaseId}/${ARTICLES_COLLECTION_ID})...`);
   let synced = 0;
+  let updated = 0;
   let skipped = 0;
+  const errors = [];
 
   const chunkSize = 5;
-  for (let i = 0; i < Math.min(articles.length, 30); i += chunkSize) {
-    const chunk = articles.slice(i, i + chunkSize);
+  const itemsToSync = articles.slice(0, 50);
+
+  for (let i = 0; i < itemsToSync.length; i += chunkSize) {
+    const chunk = itemsToSync.slice(i, i + chunkSize);
     await Promise.all(
       chunk.map(async (art) => {
-        try {
-          const docId = art.id.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 36);
-          const data = {
-            title: (art.title || '').slice(0, 255),
-            slug: (art.slug || '').slice(0, 120),
-            summary: (art.summary || art.description || '').slice(0, 1000),
-            content: (art.content || art.summary || '').slice(0, 5000),
-            imageUrl: art.imageUrl || art.image_url || '',
-            sourceName: (art.sourceName || art.source_name || 'NewsAxis').slice(0, 100),
-            sourceUrl: (art.sourceUrl || art.source_url || '').slice(0, 500),
-            authorName: (art.authorName || art.author || 'Staff').slice(0, 100),
-            categoryId: (art.categoryId || art.category || 'world').slice(0, 50),
-            contentType: (art.contentType || 'news').slice(0, 20),
-            sourceType: (art.sourceType || 'external_news').slice(0, 30),
-            publishedAt: art.publishedAt || art.published_at || new Date().toISOString(),
-            createdAt: art.createdAt || new Date().toISOString(),
-            expiresAt: art.expiresAt || new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-            isBreaking: Boolean(art.isBreaking),
-            isFeatured: Boolean(art.isFeatured),
-            views: Number(art.views || 1),
-            readingTime: Number(art.readingTime || 3)
-          };
+        const docId = getSafeDocId(art);
+        const data = formatArticleForAppwrite(art);
 
+        try {
           try {
             await databases.updateDocument(databaseId, ARTICLES_COLLECTION_ID, docId, data);
-            synced++;
+            updated++;
           } catch (updateErr) {
             if (updateErr.code === 404) {
               await databases.createDocument(databaseId, ARTICLES_COLLECTION_ID, docId, data);
               synced++;
             } else {
-              skipped++;
+              throw updateErr;
             }
           }
-        } catch {
+        } catch (err) {
           skipped++;
+          lastSyncError = `${err.code || 500}: ${err.message}`;
+          if (errors.length < 5) {
+            errors.push({ docId, error: err.message, code: err.code });
+          }
+          if (err.message && err.message.includes('missing scopes')) {
+            console.error(`[Appwrite Scope Error] API Key missing scopes: ${err.message}`);
+          } else if (err.code === 404) {
+            console.error(`[Appwrite Error] Collection "${ARTICLES_COLLECTION_ID}" not found in database "${databaseId}". Run setup:appwrite first.`);
+          } else {
+            console.warn(`[Appwrite Sync Error] Doc ${docId}: ${err.message}`);
+          }
         }
       })
     );
   }
 
-  if (synced > 0) {
-    console.log(`[Appwrite] Successfully updated ${synced} documents in Appwrite Cloud.`);
+  const success = (synced + updated) > 0 || skipped === 0;
+  console.log(`[Appwrite] Sync complete: ${synced} created, ${updated} updated, ${skipped} skipped.`);
+  return { success, synced, updated, skipped, errors };
+}
+
+/**
+ * Query articles directly from Appwrite Server-Side
+ */
+export async function getArticlesFromAppwrite({ category = 'all', type = 'all', limit = 50, page = 1 } = {}) {
+  const { databases, isConfigured, databaseId } = getAppwriteClient();
+  if (!isConfigured || !databases) return null;
+
+  try {
+    const queries = [
+      Query.orderDesc('publishedAt'),
+      Query.limit(Math.min(limit, 100)),
+      Query.offset((page - 1) * limit)
+    ];
+
+    if (category && category !== 'all') {
+      queries.push(Query.equal('categoryId', category.toLowerCase()));
+    }
+
+    if (type === 'blogs') {
+      queries.push(Query.equal('contentType', 'blog'));
+    } else if (type === 'news') {
+      queries.push(Query.equal('contentType', 'news'));
+    }
+
+    const res = await databases.listDocuments(databaseId, ARTICLES_COLLECTION_ID, queries);
+    return res.documents;
+  } catch (err) {
+    console.warn(`[Appwrite Query Note] ${err.message}`);
+    return null;
   }
-  return { success: true, synced, skipped };
 }
 
 /**
  * Purge expired articles from Appwrite Database
  */
 export async function purgeExpiredFromAppwrite(now = new Date()) {
-  const { databases, isConfigured } = getAppwriteClient();
+  const { databases, isConfigured, databaseId } = getAppwriteClient();
   if (!isConfigured || !databases) return 0;
 
   try {
     const nowIso = now.toISOString();
-    const response = await databases.listDocuments(
-      databaseId,
-      ARTICLES_COLLECTION_ID,
-      [
-        Query.lessThanEqual('expiresAt', nowIso),
-        Query.limit(50)
-      ]
-    );
+    const expired = await databases.listDocuments(databaseId, ARTICLES_COLLECTION_ID, [
+      Query.lessThanEqual('expiresAt', nowIso),
+      Query.limit(50)
+    ]);
 
-    let purged = 0;
-    for (const doc of response.documents) {
+    let deleted = 0;
+    for (const doc of expired.documents) {
       try {
         await databases.deleteDocument(databaseId, ARTICLES_COLLECTION_ID, doc.$id);
-        purged++;
+        deleted++;
       } catch {
-        // Continue
+        // quiet
       }
     }
-
-    if (purged > 0) {
-      console.log(`[Appwrite] Successfully deleted ${purged} expired documents.`);
+    if (deleted > 0) {
+      console.log(`[Appwrite Cleanup] Purged ${deleted} expired documents.`);
     }
-    return purged;
-  } catch {
+    return deleted;
+  } catch (err) {
+    console.warn(`[Appwrite Cleanup Note] ${err.message}`);
     return 0;
   }
 }
 
 /**
- * Save user-uploaded author article to Appwrite
+ * Save user created article to Appwrite
  */
-export async function saveUserArticleToAppwrite(article) {
-  const { databases, isConfigured } = getAppwriteClient();
+export async function saveUserArticleToAppwrite(articleData) {
+  const { databases, isConfigured, databaseId } = getAppwriteClient();
   if (!isConfigured || !databases) return null;
 
-  try {
-    const docId = article.id.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 36);
-    const data = {
-      title: article.title.slice(0, 255),
-      slug: article.slug.slice(0, 120),
-      summary: (article.summary || '').slice(0, 1000),
-      content: (article.content || '').slice(0, 10000),
-      imageUrl: article.imageUrl || '',
-      sourceName: article.sourceName || 'Community Author',
-      sourceUrl: article.sourceUrl || '',
-      authorName: article.authorName || 'Author',
-      categoryId: article.categoryId || 'blogs',
-      contentType: 'blog',
-      sourceType: article.sourceType || 'community_blog',
-      publishedAt: article.publishedAt,
-      createdAt: article.createdAt,
-      expiresAt: article.expiresAt, // 1 Day (24 hours)
-      isBreaking: false,
-      isFeatured: false,
-      views: 1,
-      readingTime: article.readingTime || 3
-    };
+  const docId = getSafeDocId(articleData);
+  const data = formatArticleForAppwrite(articleData);
 
+  try {
     const doc = await databases.createDocument(databaseId, ARTICLES_COLLECTION_ID, docId, data);
-    console.log(`[Appwrite] Saved author post ${doc.$id} with 24-hour expiration.`);
     return doc;
   } catch (err) {
-    console.warn(`[Appwrite] User article sync note: ${err.message}`);
+    console.warn(`[Appwrite User Article] ${err.message}`);
     return null;
   }
 }
 
 export function getAppwriteStatus() {
-  const { isConfigured } = getAppwriteClient();
   return {
     isConfigured,
     endpoint: resolvedEndpoint,
-    projectId: projectId ? `${projectId.slice(0, 8)}...` : null,
-    databaseId,
-    bucketId,
-    mode: isConfigured ? 'Appwrite Cloud Connected' : 'Local SQLite Storage Engine'
+    projectId: projectId || 'Not configured',
+    databaseId: databaseId || 'newsaxis-main',
+    bucketId: bucketId || 'newsaxis-media',
+    lastSyncError
   };
 }

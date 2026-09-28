@@ -6,13 +6,19 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const DATA_DIR = path.resolve(__dirname, '../data');
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+let db;
+try {
+  const isVercel = Boolean(process.env.VERCEL);
+  const DATA_DIR = isVercel ? '/tmp' : path.resolve(__dirname, '../data');
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  const DB_PATH = path.join(DATA_DIR, 'newsaxis.db');
+  db = new DatabaseSync(DB_PATH);
+} catch (e) {
+  console.warn('[Database] Persistent DB failed, using in-memory SQLite:', e.message);
+  db = new DatabaseSync(':memory:');
 }
-
-const DB_PATH = path.join(DATA_DIR, 'newsaxis.db');
-const db = new DatabaseSync(DB_PATH);
 
 // Initialize schema
 db.exec(`

@@ -135,9 +135,13 @@ async function executeSyncCycle(triggerReason = 'scheduled_ist_boundary') {
     console.log(`[Database] Inserted ${insertedCount} fresh articles [Batch: ${batchId}].`);
 
     // 4. Sync into Appwrite Database
-    syncArticlesToAppwrite(articles, batchId).catch(err => {
-      console.warn(`[Appwrite Sync] Background note: ${err.message}`);
-    });
+    let appwriteResult = { success: false, synced: 0, skipped: 0 };
+    try {
+      appwriteResult = await syncArticlesToAppwrite(articles, batchId);
+      console.log(`[Appwrite Sync] Result: ${appwriteResult.synced} created, ${appwriteResult.updated || 0} updated, ${appwriteResult.skipped} skipped.`);
+    } catch (err) {
+      console.warn(`[Appwrite Sync] Error: ${err.message}`);
+    }
 
     lastSyncTime = Date.now();
     const delayMs = getMsUntilNextISTBoundary(new Date());
@@ -148,8 +152,8 @@ async function executeSyncCycle(triggerReason = 'scheduled_ist_boundary') {
       articlesFetched: articles.length,
       articlesInserted: insertedCount,
       articlesPurged: purgedCount,
-      status: 'SUCCESS',
-      details: `Trigger: ${triggerReason} | IST: ${formatIST(now)} | Expires: ${expiresAt}`
+      status: appwriteResult.success ? 'SUCCESS' : 'PARTIAL_APPWRITE',
+      details: `Trigger: ${triggerReason} | IST: ${formatIST(now)} | Expires: ${expiresAt} | Appwrite: ${appwriteResult.synced || 0} synced`
     });
 
     console.log(`[Scheduler] Cycle complete in ${Date.now() - cycleStart}ms.`);
@@ -160,6 +164,7 @@ async function executeSyncCycle(triggerReason = 'scheduled_ist_boundary') {
       purgedCount,
       insertedCount,
       totalActive: articles.length,
+      appwrite: appwriteResult,
       lastSyncIST: formatIST(new Date(lastSyncTime)),
       nextSyncIST: formatIST(new Date(nextSyncTime))
     };
@@ -204,16 +209,16 @@ app.get('/api/status', (req, res) => {
     activeArticles: stats.activeArticles,
     totalPurgedHistorical: stats.totalPurgedHistorical,
     lastSyncLog: stats.lastSync,
-    database: 'SQLite (WAL mode)',
+    database: 'Appwrite Cloud + SQLite Cache',
     appwrite: getAppwriteStatus()
   });
 });
 
 /**
- * POST /api/sync
+ * POST or GET /api/sync
  * Manually trigger an immediate sync & purge cycle
  */
-app.post('/api/sync', async (req, res) => {
+app.all(['/api/sync', '/api/sync/execute'], async (req, res) => {
   const result = await executeSyncCycle('manual_user_trigger');
   res.json(result);
 });

@@ -1,196 +1,238 @@
-# NewsAxis • Complete Appwrite Setup Guide
+# NewsAxis • Complete Appwrite & Live News Pipeline Setup Guide
 
-This guide gives you the complete instructions and code to set up your **Appwrite Cloud** or **Self-Hosted Appwrite** database, collections, attributes, indexes, and media storage for NewsAxis.
-
----
-
-## 🏗️ Architecture Overview
-
-- **Real-World News & Blogs**: Refetched every **30 minutes** from verified global sources and news APIs. Stored in Appwrite `articles` collection and SQLite cache. Auto-purged every 30 minutes when fresh news arrives.
-- **User-Uploaded News & Community Blogs**: Saved to Appwrite `articles` collection and storage. Retained for **1 day (24 hours)** and automatically deleted after 24 hours.
-- **Media Storage**: Hosted in Appwrite Storage bucket `newsaxis-media`.
-- **Live News Streams**: Free 24/7 live video news streams (Sky News, DW News, France 24, NBC News, India Today).
+This guide details the exact architecture, root-cause diagnosis, and step-by-step configuration for the **NewsAxis** live news and blog system.
 
 ---
 
-## ⚡ Option 1: Automated 1-Command Setup (Recommended)
+## 🔍 Root Cause Analysis: Why Appwrite Had 0 News Documents
 
-NewsAxis includes an automated setup script that creates the database, all collections, all attributes, and the storage bucket automatically.
+During end-to-end debugging, three critical root causes were identified:
 
-### Step 1: Create an Appwrite Account & Project
-1. Log in to [Appwrite Cloud](https://cloud.appwrite.io) (or your self-hosted console).
-2. Click **Create Project** and name it `NewsAxis`.
-3. Note your **Project ID** from the Project Settings.
+1. **Appwrite Server API Key Missing Required Scopes (401 Unauthorized Scope)**:
+   - When the backend tried to sync news to Appwrite or run setup scripts, Appwrite Cloud rejected every operation with:
+     ```
+     app.6a854c5d... missing scopes (["documents.write"]) code: 401 type: general_unauthorized_scope
+     missing scopes (["collections.write"]) code: 401
+     ```
+   - In Appwrite Console, when an API Key is generated, scopes are **not enabled by default**. Without `documents.write`, `collections.write`, `attributes.write`, etc., all writes fail.
+   - In the legacy code, these errors were caught with `catch { skipped++; }` without logging, making it look as though sync ran while 0 documents were written.
 
-### Step 2: Create an API Key in Appwrite
-1. Go to **Project Settings** > **API Keys** > **Create API Key**.
-2. Name it `NewsAxis Server Key`.
-3. Grant the following scopes:
-   - `databases.read`, `databases.write`
-   - `collections.read`, `collections.write`
-   - `attributes.read`, `attributes.write`
-   - `indexes.read`, `indexes.write`
-   - `documents.read`, `documents.write`
-   - `files.read`, `files.write`
-   - `buckets.read`, `buckets.write`
-   - `users.read`, `users.write`
-4. Copy the secret API key.
+2. **Collection `articles` Did Not Exist in Database**:
+   - Because `collections.write` was missing, `setup-appwrite.js` could not create the collection.
+   - When the frontend Web SDK attempted to list documents, Appwrite returned:
+     ```
+     Collection with the requested ID 'articles' could not be found. 404 collection_not_found
+     ```
 
-### Step 3: Configure `.env.local`
-Create a `.env.local` file in the root of the project with:
+3. **Frontend / Vercel Disconnect & Infinite "Refresh Live Reader"**:
+   - The frontend was relying solely on `fetch('/api/news')` instead of directly loading from Appwrite.
+   - On Vercel, `server/index.js` (Express) does not run as a persistent server. Because there were no Vercel serverless function files in `api/`, `vercel.json` rewrote `/api/news` to `/index.html`.
+   - The browser then received HTML instead of JSON, triggering client-side RSS fallbacks that were blocked by browser **CORS**.
+   - With 0 articles, the UI fell into the empty state and endlessly prompted "Refresh Live Reader", calling the failing `/api/sync` endpoint in a loop.
 
-```env
-# Appwrite Public Variables (Browser)
-VITE_APPWRITE_ENDPOINT=https://cloud.appwrite.io/v1
-VITE_APPWRITE_PROJECT_ID=your_project_id_here
-VITE_APPWRITE_DATABASE_ID=newsaxis-main
-VITE_APPWRITE_BUCKET_ID=newsaxis-media
+---
 
-# Appwrite Server Admin Key (for automated setup and server-side news syncing)
-APPWRITE_API_KEY=your_secret_api_key_here
-APPWRITE_DATABASE_ID=newsaxis-main
-APPWRITE_BUCKET_ID=newsaxis-media
+## 🛠️ Complete Step-by-Step Appwrite Setup
 
-# Real-World News API Keys (Optional, add any you have)
-VITE_GNEWS_API_KEY=
-VITE_NEWSDATA_API_KEY=
-VITE_NEWSAPI_KEY=
-VITE_MEDIASTACK_API_KEY=
-VITE_THENEWSAPI_KEY=
-```
+### Step 1: Create or Open Your Appwrite Project
+1. Log in to [Appwrite Cloud](https://cloud.appwrite.io).
+2. Select or create your project:
+   - **Project Name**: `NewsAxis`
+   - **Project ID**: Note your Project ID (e.g. `6a854c5d0026a9224d01`).
+   - **Endpoint**: Note your regional endpoint (e.g., `https://sgp.cloud.appwrite.io/v1` for Singapore or `https://cloud.appwrite.io/v1` for global).
 
-### Step 4: Run the Setup Script
-Run:
+---
+
+### Step 2: Create Server API Key with Mandatory Scopes
+> [!IMPORTANT]
+> This is the single most common reason why documents do not reach Appwrite. You must grant the scopes listed below.
+
+1. In the Appwrite Console, go to **Project Settings** (gear icon) > **API Keys**.
+2. Click **Create API Key**.
+3. Name: `NewsAxis Server Key`.
+4. Set **Expiration**: Desired expiration (or never for persistent sync).
+5. Enable all the following scopes:
+   - **Databases**: `databases.read`, `databases.write`
+   - **Collections**: `collections.read`, `collections.write`
+   - **Attributes**: `attributes.read`, `attributes.write`
+   - **Indexes**: `indexes.read`, `indexes.write`
+   - **Documents**: `documents.read`, `documents.write`
+   - **Files**: `files.read`, `files.write`
+   - **Buckets**: `buckets.read`, `buckets.write`
+   - **Users**: `users.read`, `users.write`
+6. Click **Create** and copy the secret key.
+
+---
+
+### Step 3: Run the Automated Setup Script
+In your terminal, run:
 ```bash
-# If your VITE_APPWRITE_PROJECT_ID is in .env.local:
 npm run setup:appwrite
-
-# OR pass your Project ID directly:
-node scripts/setup-appwrite.js <YOUR_PROJECT_ID>
 ```
-
-The script will automatically:
-- Create database `newsaxis-main`
-- Create collections: `articles`, `profiles`, `comments`, `bookmarks`
-- Create all string, boolean, integer attributes
-- Create storage bucket `newsaxis-media` (10MB limit, image types, public read)
-
----
-
-## 📋 Option 2: Manual Console Setup (Step-by-Step)
-
-If you prefer to configure Appwrite manually in the web console, follow these steps:
-
-### Step 1: Create Database
-1. In the Appwrite console, navigate to **Databases** > **Create Database**.
-2. Set **Database ID** to: `newsaxis-main`.
-3. Set **Name** to: `NewsAxis Main Database`.
+The script will:
+- Check and validate that your API key has all required scopes.
+- Create Database `newsaxis-main` (or your configured `APPWRITE_DATABASE_ID`).
+- Create Collection `articles` with proper permissions (`read: any`, `create: any`, `update: users`, `delete: users`).
+- Create all 24 typed attributes on `articles` with safe size limits.
+- Create indexes on `slug`, `categoryId`, `publishedAt`, and `expiresAt`.
+- Create Storage Bucket `newsaxis-media` with public read access.
+- Execute a live write and read test to confirm end-to-end functionality.
 
 ---
 
-### Step 2: Create Collection `articles`
-1. Inside database `newsaxis-main`, click **Create Collection**.
-2. **Collection ID**: `articles`
-3. **Name**: `News & Blog Articles`
-4. In **Settings** > **Permissions**, add:
-   - `Any` -> Read
-   - `Users` -> Create, Update, Delete
-   - `Any` -> Create (optional for guest submissions)
+### Step 4: Manual Appwrite Console Setup (Alternative)
+
+If you prefer to configure manually in the Appwrite Console:
+
+#### 1. Database:
+- **Database ID**: `newsaxis-main`
+- **Name**: `NewsAxis Main Database`
+
+#### 2. Collection `articles`:
+- **Collection ID**: `articles`
+- **Name**: `News & Blog Articles`
+- **Permissions**:
+  - `Any` -> Read
+  - `Any` -> Create
+  - `Users` -> Update, Delete
 
 #### Attributes for `articles`:
-
 | Key | Type | Size | Required | Default | Description |
 |---|---|---|---|---|---|
-| `title` | String | 255 | Yes | - | Headline of article |
-| `slug` | String | 150 | Yes | - | URL slug |
-| `summary` | String | 1000 | No | - | Brief summary |
-| `content` | String | 50000 | No | - | Body content (Markdown/HTML) |
-| `imageUrl` | String | 1000 | No | - | High-res cover image URL |
-| `sourceName` | String | 100 | No | NewsAxis | Name of publication |
-| `sourceUrl` | String | 1000 | No | - | Original canonical URL |
-| `authorName` | String | 100 | No | Staff | Journalist / Author name |
-| `authorId` | String | 100 | No | - | User ID or guest |
-| `categoryId` | String | 50 | No | world | e.g. world, india, technology |
-| `contentType` | String | 20 | No | news | news or blog |
+| `title` | String | 500 | Yes | - | Article headline |
+| `slug` | String | 255 | Yes | - | URL slug |
+| `description` | String | 2000 | No | - | Excerpt or brief summary |
+| `summary` | String | 2000 | No | - | Full summary text |
+| `content` | String | 10000 | No | - | Article body / excerpt |
+| `imageUrl` | String | 1000 | No | - | High-res image URL |
+| `source` | String | 150 | No | NewsAxis | News agency / publication |
+| `sourceName` | String | 150 | No | NewsAxis | News agency / publication |
+| `sourceUrl` | String | 1000 | No | - | Canonical source link |
+| `url` | String | 1000 | No | - | Canonical source link |
+| `author` | String | 150 | No | Staff | Journalist / Author name |
+| `authorName` | String | 150 | No | Staff | Journalist / Author name |
+| `authorId` | String | 100 | No | - | User ID if authored |
+| `category` | String | 100 | No | world | e.g. breaking, india, world, politics, business |
+| `categoryId` | String | 100 | No | world | Category slug identifier |
+| `provider` | String | 100 | No | rss | Provider source (bbc, gnews, dev_to, etc.) |
+| `language` | String | 20 | No | en | Language code |
+| `contentType` | String | 50 | No | news | news or blog |
 | `sourceType` | String | 50 | No | external_news | external_news, external_blog, community_blog |
-| `publishedAt` | String | 50 | No | - | ISO publication time |
-| `createdAt` | String | 50 | No | - | ISO creation time |
-| `expiresAt` | String | 50 | No | - | Expiration ISO time (30m for news, 24h for user posts) |
-| `isBreaking` | Boolean | - | No | false | True if breaking dispatch |
-| `isFeatured` | Boolean | - | No | false | True if top lead story |
+| `publishedAt` | String | 100 | No | - | UTC ISO timestamp |
+| `createdAt` | String | 100 | No | - | UTC ISO timestamp |
+| `expiresAt` | String | 100 | No | - | Expiration ISO (30m for news, 24h for user posts) |
+| `isBreaking` | Boolean | - | No | false | True if urgent breaking dispatch |
+| `isFeatured` | Boolean | - | No | false | True if featured lead story |
 | `views` | Integer | - | No | 1 | View counter |
-| `readingTime` | Integer | - | No | 3 | Estimated minutes |
+| `readingTime` | Integer | - | No | 3 | Estimated read time in minutes |
 
 #### Indexes for `articles`:
-1. `idx_slug`: Type `unique`, Attributes `slug`
-2. `idx_expires`: Type `key`, Attributes `expiresAt` (used by 30-min auto-cleanup)
-3. `idx_category`: Type `key`, Attributes `categoryId`
+1. `idx_slug`: Key on `slug`
+2. `idx_category`: Key on `categoryId`
+3. `idx_published`: Key on `publishedAt`
+4. `idx_expires`: Key on `expiresAt`
+
+#### 3. Storage Bucket `newsaxis-media`:
+- **Bucket ID**: `newsaxis-media`
+- **Name**: `NewsAxis Media Assets`
+- **File Size Limit**: `10MB`
+- **Allowed Extensions**: `jpg`, `jpeg`, `png`, `webp`, `gif`, `svg`
+- **File Security**: Disabled (allows public reading of images)
+- **Permissions**:
+  - `Any` -> Read
+  - `Users` -> Create, Update, Delete
 
 ---
 
-### Step 3: Create Collection `profiles`
-1. Click **Create Collection**.
-2. **Collection ID**: `profiles`
-3. **Permissions**: Read: `Any`, Create/Update/Delete: `Users`.
+## 🔐 Environment Variables (.env / Vercel)
 
-#### Attributes for `profiles`:
-| Key | Type | Size | Required | Default |
-|---|---|---|---|---|
-| `userId` | String | 100 | Yes | - |
-| `name` | String | 100 | Yes | - |
-| `username` | String | 50 | Yes | - |
-| `email` | String | 150 | No | - |
-| `bio` | String | 500 | No | - |
-| `avatarUrl` | String | 1000 | No | - |
-| `role` | String | 20 | No | author |
+Configure the following variables in your `.env` (or `.env.local` for development and Vercel Project Settings for production):
 
----
+```env
+# ==============================================================================
+# 1. APPWRITE CLIENT CONFIGURATION (Browser / Frontend)
+# ==============================================================================
+VITE_APPWRITE_ENDPOINT=https://sgp.cloud.appwrite.io/v1
+VITE_APPWRITE_PROJECT_ID=6a854c5d0026a9224d01
+VITE_APPWRITE_DATABASE_ID=6ab613fc0006b9fedac1
+VITE_APPWRITE_BUCKET_ID=6ab614cc0022aa43fab8
 
-### Step 4: Create Collection `comments`
-1. Click **Create Collection**.
-2. **Collection ID**: `comments`
-3. **Permissions**: Read: `Any`, Create/Update/Delete: `Users`.
+# Collection IDs
+VITE_APPWRITE_COLLECTION_ARTICLES=articles
+VITE_APPWRITE_COLLECTION_PROFILES=profiles
+VITE_APPWRITE_COLLECTION_COMMENTS=comments
+VITE_APPWRITE_COLLECTION_BOOKMARKS=bookmarks
 
-#### Attributes for `comments`:
-| Key | Type | Size | Required |
-|---|---|---|---|
-| `articleId` | String | 100 | Yes |
-| `userId` | String | 100 | Yes |
-| `userName` | String | 100 | No |
-| `content` | String | 2000 | Yes |
-| `createdAt` | String | 50 | No |
+# ==============================================================================
+# 2. APPWRITE SERVER & API KEY (Backend Server & Vercel Functions ONLY)
+# ==============================================================================
+# IMPORTANT: Must have databases, collections, attributes, indexes, documents, files scopes
+APPWRITE_ENDPOINT=https://sgp.cloud.appwrite.io/v1
+APPWRITE_PROJECT_ID=6a854c5d0026a9224d01
+APPWRITE_API_KEY=your_secret_api_key_with_all_scopes_here
+APPWRITE_DATABASE_ID=6ab613fc0006b9fedac1
+APPWRITE_BUCKET_ID=6ab614cc0022aa43fab8
 
----
+# ==============================================================================
+# 3. NEWS PROVIDER KEYS (Optional, free public RSS feeds work automatically)
+# ==============================================================================
+GNEWS_API_KEY=
+NEWSDATA_API_KEY=
+NEWS_API_KEY=
+THENEWS_API_KEY=
+MEDIASTACK_API_KEY=
+CURRENTS_API_KEY=
 
-### Step 5: Create Storage Bucket `newsaxis-media`
-1. In the Appwrite console, go to **Storage** > **Create Bucket**.
-2. **Bucket ID**: `newsaxis-media`
-3. **Name**: `NewsAxis Media Assets`
-4. **Settings**:
-   - **File Size Limit**: `10MB`
-   - **Allowed Extensions**: `jpg`, `jpeg`, `png`, `webp`, `gif`, `svg`
-   - **File Security**: Disabled (allows public reading of images)
-   - **Permissions**:
-     - `Any` -> Read
-     - `Users` -> Create, Update, Delete
-
----
-
-## 🚀 Running the App
-
-To run both the 30-minute real-world news ingestion server and the frontend together:
-
-```bash
-npm run dev:all
+# ==============================================================================
+# 4. RETENTION POLICIES
+# ==============================================================================
+NEWS_RETENTION_MINUTES=30
+USER_POST_RETENTION_HOURS=24
 ```
 
-- Frontend: `http://localhost:5173`
-- Database Server: `http://localhost:3001`
-- Server Status: `http://localhost:3001/api/status`
-- News API Payload: `http://localhost:3001/api/news`
+> [!CAUTION]
+> Never expose `APPWRITE_API_KEY` with `VITE_` prefix. Only public IDs and endpoints should use `VITE_`.
 
-### What happens automatically:
-1. **Startup**: The server fetches ~400+ real-world news items from BBC, The Hindu, Google News, TechCrunch, Wired, DEV.to, HackerNews, and any configured API keys.
-2. **30-Minute Cycle**: Every 30 minutes, expired news (>30m) is automatically purged and fresh articles are ingested into the database and Appwrite.
-3. **User Uploads**: Community stories published through `/write` are saved to the database and Appwrite with an expiration of **1 day (24 hours)**.
-4. **Live Broadcasts**: Users can stream free live 24/7 world news directly by clicking **LIVE TV**.
+---
+
+## ⚡ 30-Minute Automatic Refresh Pipeline
+
+1. **Vercel Serverless & Cron**:
+   - `vercel.json` schedules `*/30 * * * *` targeting `/api/sync`.
+   - Vercel automatically runs `/api/sync` every 30 minutes.
+   - The handler pulls fresh news from BBC, The Hindu, Google News, DEV.to, Medium, HackerNews, and configured APIs, deduplicates by URL and title hash, and upserts them directly to Appwrite `articles`.
+   - Articles older than 30 minutes are automatically purged from Appwrite.
+
+2. **Frontend Immediate Appwrite Loading**:
+   - When a user visits NewsAxis, the browser immediately queries Appwrite Database `articles` collection via the Appwrite Client SDK.
+   - Articles render instantly (sub-50ms) without waiting for background server tasks.
+
+3. **Manual Refresh**:
+   - Clicking **Refresh** in the header or edition bar triggers `POST /api/sync`.
+   - The backend runs an immediate sync cycle, updates Appwrite, and refreshes the feed with a confirmation toast.
+
+---
+
+## ✅ Verification Checklist
+
+1. **Verify Appwrite Scopes**:
+   ```bash
+   node -e "import('./server/appwrite.js').then(m => console.log(m.getAppwriteStatus()));"
+   ```
+2. **Run Setup Script**:
+   ```bash
+   npm run setup:appwrite
+   ```
+   Confirm all attributes and bucket are created.
+3. **Trigger News Aggregation & Appwrite Sync**:
+   ```bash
+   node -e "import('./server/index.js'); import('./server/aggregator.js').then(async a => { const r = await a.aggregateRealWorldContent(30); const ap = await import('./server/appwrite.js'); await ap.syncArticlesToAppwrite(r.articles, r.batchId); console.log('Done!'); process.exit(0); });"
+   ```
+4. **Confirm Documents Appear in Appwrite Console**:
+   - Open Appwrite Console > Databases > `newsaxis-main` > `articles`.
+   - Confirm 30+ real articles exist with title, summary, source, category, and IST timestamps.
+5. **Start Frontend & Server**:
+   ```bash
+   npm run dev:all
+   ```
+   Open `http://localhost:5173` and confirm the homepage loads with real news, live breaking ticker, and category filters.

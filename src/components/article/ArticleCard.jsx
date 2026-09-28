@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Bookmark, Clock, Flame, ExternalLink, Sparkles } from 'lucide-react';
 import { articleService } from '../../services/articleService';
+import { formatISTShort } from '../../utils/istDate';
 
 export function ArticleCard({ article, compact = false, showExpiration = true, lead = false }) {
   const [isBookmarked, setIsBookmarked] = useState(() => articleService.isBookmarked(article?.id));
@@ -47,6 +48,7 @@ export function ArticleCard({ article, compact = false, showExpiration = true, l
   };
 
   const timeAgo = getTimeAgo(article.publishedAt || article.createdAt);
+  const istTime = article.publishedAtIST || formatISTShort(article.publishedAt || article.createdAt);
   const isDevBlog = article.sourceType === 'external_blog' || article.contentType === 'blog';
 
   // 1. Compact Sidebar Article
@@ -74,8 +76,9 @@ export function ArticleCard({ article, compact = false, showExpiration = true, l
           <span className="uppercase text-[10px] font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[110px]">
             {article.sourceName}
           </span>
-          <div className="flex items-center gap-2 text-slate-400">
+          <div className="flex items-center gap-1.5 text-slate-400" title={istTime ? `${istTime}` : ''}>
             {timeAgo && <span>{timeAgo}</span>}
+            {istTime && <span className="hidden sm:inline text-[9px] text-slate-500 font-mono">• {istTime}</span>}
             <span>•</span>
             <span>{article.readingTime || 3}m</span>
           </div>
@@ -141,7 +144,8 @@ export function ArticleCard({ article, compact = false, showExpiration = true, l
             <span>By {article.authorName}</span>
           </span>
           <div className="flex items-center gap-2 text-slate-500">
-            {timeAgo && <span>{timeAgo}</span>}
+            {timeAgo && <span title={istTime}>{timeAgo}</span>}
+            {istTime && <span className="text-[11px] text-slate-400 font-mono">({istTime})</span>}
             <span>•</span>
             <span>{article.readingTime || 3} min read</span>
           </div>
@@ -213,8 +217,9 @@ export function ArticleCard({ article, compact = false, showExpiration = true, l
         <span className="truncate max-w-[130px] uppercase text-[10px] font-bold text-slate-700 dark:text-slate-300">
           {article.sourceName}
         </span>
-        <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+        <div className="flex items-center gap-1.5 text-[10px] text-slate-400" title={istTime ? `${istTime}` : ''}>
           {timeAgo && <span>{timeAgo}</span>}
+          {istTime && <span className="hidden sm:inline text-[9px] text-slate-500 font-mono">• {istTime}</span>}
           <span>•</span>
           <span>{article.readingTime || 3}m read</span>
         </div>

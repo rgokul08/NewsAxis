@@ -2,7 +2,7 @@ import { describe, test, expect } from 'vitest';
 import { normalizeArticle, deduplicateArticles, calculateTrendingScore } from '../../src/utils/normalizeArticle.js';
 
 describe('NewsAxis Article Utilities & Policies', () => {
-  test('normalizeArticle enforces 72-hour expiration for community content', () => {
+  test('normalizeArticle enforces 24-hour expiration for community content', () => {
     const raw = {
       title: 'Community Web Security Review',
       content: 'Important security considerations for client side state.',
@@ -16,7 +16,7 @@ describe('NewsAxis Article Utilities & Policies', () => {
     const expiryTime = new Date(normalized.expiresAt).getTime();
     const diffHours = (expiryTime - createdTime) / (1000 * 60 * 60);
 
-    expect(Math.round(diffHours)).toBe(72);
+    expect(Math.round(diffHours)).toBe(24);
   });
 
   test('deduplicateArticles eliminates duplicated canonical URLs and provider IDs', () => {
