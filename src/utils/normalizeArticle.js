@@ -1,3 +1,5 @@
+import { getDynamicArticleImage } from './dynamicImage.js';
+
 /**
  * Normalizes any external item or user submission to the canonical NewsAxis content model.
  */
@@ -35,7 +37,7 @@ export function normalizeArticle(raw = {}) {
     summary: raw.summary || raw.excerpt || '',
     excerpt: raw.excerpt || (raw.summary ? raw.summary.slice(0, 160) + '...' : ''),
     content: raw.content || raw.summary || '',
-    imageUrl: raw.imageUrl || raw.coverImageUrl || 'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=1200&auto=format&fit=crop&q=80',
+    imageUrl: raw.imageUrl || raw.coverImageUrl || getDynamicArticleImage(raw.title, detectedCategory, raw.id || raw.$id || raw.externalId),
     imageAlt: raw.imageAlt || raw.title || 'News cover image',
     sourceName: raw.sourceName || (isCommunity ? 'NewsAxis Community' : 'NewsAxis Desk'),
     sourceUrl: raw.sourceUrl || '',

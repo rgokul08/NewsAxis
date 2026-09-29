@@ -1,5 +1,6 @@
 import { BaseProvider } from './baseProvider';
 import { normalizeArticle } from '../utils/normalizeArticle';
+import { getDynamicArticleImage } from '../utils/dynamicImage';
 
 /**
  * Public RSS Feed to JSON Provider (Google News, Medium, TechCrunch, BBC, The Hindu)
@@ -68,7 +69,7 @@ export class PublicFeedProvider extends BaseProvider {
       title: raw.title,
       summary: cleanSummary.slice(0, 320),
       content: cleanSummary,
-      imageUrl: img || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200&auto=format&fit=crop&q=80',
+      imageUrl: img || getDynamicArticleImage(raw.title, this.defaultCategory, raw.guid || raw.link),
       sourceName: this.name,
       sourceUrl: raw.link,
       authorName: raw.author || this.name,

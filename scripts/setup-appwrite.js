@@ -171,7 +171,14 @@ async function run() {
   await str('articles', 'tags', 2000);              // JSON string
   await str('articles', 'publishedAt', 50);
   await str('articles', 'createdAt', 50);
-  await str('articles', 'expiresAt', 50, true);      // required — every doc must expire
+  await str('articles', 'expiresAt', 50, true);
+  await str('articles', 'description', 2000);
+  await str('articles', 'source', 100);
+  await str('articles', 'author', 100);
+  await str('articles', 'category', 50);
+  await str('articles', 'provider', 50);
+  await str('articles', 'url', 1000);
+  await str('articles', 'language', 20);
   await bool('articles', 'isBreaking', false, false);
   await bool('articles', 'isFeatured', false, false);
   await int('articles', 'views', false, 0, 100000000, 1);

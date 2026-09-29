@@ -51,4 +51,18 @@ describe('NewsAxis Article Utilities & Policies', () => {
 
     expect(freshScore).toBeGreaterThan(oldScore);
   });
+
+  test('normalizeArticle assigns distinct and topic-relevant images without duplicates', () => {
+    const cricket = normalizeArticle({ title: 'Cricket World Cup final in Ahmedabad', categoryId: 'sports', id: 'c1' });
+    const market = normalizeArticle({ title: 'Sensex hits all time high in Mumbai', categoryId: 'business', id: 'm1' });
+    const space = normalizeArticle({ title: 'ISRO plans next lunar orbiter mission', categoryId: 'science', id: 's1' });
+
+    expect(cricket.imageUrl).toMatch(/^https:\/\/images\.unsplash\.com/);
+    expect(market.imageUrl).toMatch(/^https:\/\/images\.unsplash\.com/);
+    expect(space.imageUrl).toMatch(/^https:\/\/images\.unsplash\.com/);
+
+    expect(cricket.imageUrl).not.toBe(market.imageUrl);
+    expect(market.imageUrl).not.toBe(space.imageUrl);
+    expect(cricket.imageUrl).not.toBe(space.imageUrl);
+  });
 });

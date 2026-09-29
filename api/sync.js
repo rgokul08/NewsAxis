@@ -8,10 +8,14 @@ import { insertArticles, purgeExpiredArticles, recordSyncLog } from '../server/d
  * or manually via POST/GET from the NewsAxis frontend "Refresh" button.
  */
 export default async function handler(req, res) {
-  // Set CORS headers
+  // Set CORS and Anti-Cache headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();

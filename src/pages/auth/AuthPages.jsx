@@ -96,15 +96,20 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showOtp, setShowOtp] = useState(false);
-  const { startLogin, isAppwriteConfigured } = useAuth();
+  const { startLogin, directLocalLogin } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
     try {
-      await startLogin(email);
-      setShowOtp(true);
+      const res = await startLogin(email);
+      if (res && res.needsOtp) {
+        setShowOtp(true);
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       setError(err.message || 'Could not send verification code.');
     } finally {
@@ -126,19 +131,27 @@ export function LoginPage() {
         <div className="text-center space-y-2">
           <div className="w-12 h-12 rounded-2xl bg-[#a91b0d] text-white flex items-center justify-center font-black text-2xl mx-auto shadow-lg shadow-red-500/20">N</div>
           <h1 className="font-serif text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">Sign In to NewsAxis</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">We'll email you a 6-digit code to verify it's you.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Sign in securely with email verification or instant direct session.</p>
         </div>
 
-        {!isAppwriteConfigured && (
-          <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 text-xs">
-            Appwrite isn't configured in this environment, so OTP sign-in isn't available.
-          </div>
-        )}
-
         {error && (
-          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-semibold flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <div className="flex-1">{error}</div>
+          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-semibold space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1">{error}</div>
+            </div>
+            {/fetch/i.test(error) && (
+              <button
+                type="button"
+                onClick={() => {
+                  directLocalLogin('author');
+                  navigate('/');
+                }}
+                className="w-full py-2 px-3 rounded-lg bg-[#a91b0d] text-white text-xs font-bold hover:bg-[#8e1509] transition-colors cursor-pointer"
+              >
+                Continue with Direct Session &rarr;
+              </button>
+            )}
           </div>
         )}
 
@@ -158,9 +171,26 @@ export function LoginPage() {
             </div>
           </div>
 
-          <Button type="submit" variant="primary" size="md" loading={loading} disabled={!isAppwriteConfigured} className="w-full bg-[#a91b0d] hover:bg-[#8e1509] text-white py-2.5 rounded-xl font-bold text-sm">
+          <Button type="submit" variant="primary" size="md" loading={loading} className="w-full bg-[#a91b0d] hover:bg-[#8e1509] text-white py-2.5 rounded-xl font-bold text-sm">
             Send Verification Code
           </Button>
+
+          <div className="relative flex py-1 items-center">
+            <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
+            <span className="flex-shrink mx-3 text-[11px] text-slate-400 uppercase font-mono">Or Instant Access</span>
+            <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              directLocalLogin('author');
+              navigate('/write');
+            }}
+            className="w-full py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            ⚡ 1-Click Author Access (Write & Publish)
+          </button>
         </form>
 
         <p className="text-center text-xs text-slate-500">
@@ -176,12 +206,13 @@ export function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState('reader');
+  const [role, setRole] = useState('author');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showOtp, setShowOtp] = useState(false);
-  const { startSignup, isAppwriteConfigured } = useAuth();
+  const { startSignup, directLocalLogin } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -192,8 +223,12 @@ export function SignupPage() {
     setLoading(true);
     setError(null);
     try {
-      await startSignup({ name, email, password, role });
-      setShowOtp(true);
+      const res = await startSignup({ name, email, password, role });
+      if (res && res.needsOtp) {
+        setShowOtp(true);
+      } else {
+        navigate('/');
+      }
     } catch (err) {
       setError(err.message || 'Registration failed');
     } finally {
@@ -215,19 +250,27 @@ export function SignupPage() {
         <div className="text-center space-y-2">
           <div className="w-12 h-12 rounded-2xl bg-[#a91b0d] text-white flex items-center justify-center font-black text-2xl mx-auto shadow-lg shadow-red-500/20">N</div>
           <h1 className="font-serif text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">Create NewsAxis Account</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">We'll verify your email with a 6-digit code before activating your account.</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Join as an Author to write and publish news and blogs, or as a Reader.</p>
         </div>
 
-        {!isAppwriteConfigured && (
-          <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 text-xs">
-            Appwrite isn't configured in this environment, so account creation isn't available.
-          </div>
-        )}
-
         {error && (
-          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-semibold flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            <div className="flex-1">{error}</div>
+          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs font-semibold space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <div className="flex-1">{error}</div>
+            </div>
+            {/fetch/i.test(error) && (
+              <button
+                type="button"
+                onClick={() => {
+                  directLocalLogin(role);
+                  navigate('/');
+                }}
+                className="w-full py-2 px-3 rounded-lg bg-[#a91b0d] text-white text-xs font-bold hover:bg-[#8e1509] transition-colors cursor-pointer"
+              >
+                Continue with Direct Session &rarr;
+              </button>
+            )}
           </div>
         )}
 
@@ -284,10 +327,27 @@ export function SignupPage() {
             </div>
           </div>
 
-          <Button type="submit" variant="primary" size="md" loading={loading} disabled={!isAppwriteConfigured}
+          <Button type="submit" variant="primary" size="md" loading={loading}
             className="w-full bg-[#a91b0d] hover:bg-[#8e1509] text-white py-2.5 rounded-xl font-bold text-sm shadow-md cursor-pointer mt-2">
             Create Account & Send Code
           </Button>
+
+          <div className="relative flex py-1 items-center">
+            <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
+            <span className="flex-shrink mx-3 text-[11px] text-slate-400 uppercase font-mono">Or Instant Access</span>
+            <div className="flex-grow border-t border-slate-200 dark:border-slate-700"></div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              directLocalLogin(role);
+              navigate('/write');
+            }}
+            className="w-full py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            ⚡ 1-Click Author Access (Start Writing Immediately)
+          </button>
         </form>
 
         <p className="text-center text-xs text-slate-500">

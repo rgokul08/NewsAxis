@@ -1,72 +1,94 @@
-import { getActiveArticles } from '../server/db.js';
-import { getArticlesFromAppwrite, getAppwriteClient, syncArticlesToAppwrite } from '../server/appwrite.js';
+import { getActiveArticles, insertArticles } from '../server/db.js';
+import { getArticlesFromAppwrite, syncArticlesToAppwrite } from '../server/appwrite.js';
 import { aggregateRealWorldContent, formatIST } from '../server/aggregator.js';
 
 /**
  * Vercel Serverless Function: /api/news
- * Core news API endpoint: returns active real-world articles.
- * Queries Appwrite first; falls back to SQLite cache;
- * auto-triggers ingestion if database has 0 items so visitors never see blank screens.
+ * Core news API endpoint: returns active real-world articles from database.
+ * Supports forced refresh (?refresh=true) and auto-detects stale content (>20m)
+ * to guarantee that reloading or refreshing always presents the newest news.
  */
 export default async function handler(req, res) {
-  // Set CORS headers
+  // Set CORS and Anti-Cache headers so browsers always get fresh news on reload
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.setHeader('Surrogate-Control', 'no-store');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  const { category, type, search, limit = 50, page = 1 } = req.query;
+  const { category, type, search, limit = 50, page = 1, refresh } = req.query;
   const numLimit = parseInt(limit, 10) || 50;
   const numPage = parseInt(page, 10) || 1;
+  const shouldRefresh = refresh === 'true' || req.query.force === 'true';
   const now = new Date();
 
   try {
     let articles = [];
 
-    // 1. Try querying Appwrite Cloud first
-    try {
-      const appwriteDocs = await getArticlesFromAppwrite({
-        category,
-        type,
-        limit: numLimit,
-        page: numPage
-      });
-
-      if (appwriteDocs && appwriteDocs.length > 0) {
-        articles = appwriteDocs.map(d => ({
-          id: d.$id || d.id,
-          title: d.title,
-          slug: d.slug,
-          summary: d.summary || d.description,
-          description: d.description || d.summary,
-          content: d.content,
-          imageUrl: d.imageUrl,
-          sourceName: d.sourceName || d.source,
-          sourceUrl: d.sourceUrl || d.url,
-          authorName: d.authorName || d.author,
-          categoryId: d.categoryId || d.category,
-          categorySlug: d.categoryId || d.category,
-          providerId: d.provider,
-          language: d.language || 'en',
-          contentType: d.contentType || 'news',
-          sourceType: d.sourceType || 'external_news',
-          publishedAt: d.publishedAt,
-          publishedAtIST: d.publishedAtIST || formatIST(d.publishedAt),
-          expiresAt: d.expiresAt,
-          isBreaking: Boolean(d.isBreaking),
-          isFeatured: Boolean(d.isFeatured),
-          views: Number(d.views || 1),
-          readingTime: Number(d.readingTime || 3)
-        }));
+    // If explicit refresh requested, immediately aggregate live feeds
+    if (shouldRefresh) {
+      console.log('[Vercel /api/news] Explicit refresh requested, pulling fresh news...');
+      try {
+        const aggResult = await aggregateRealWorldContent(30);
+        if (aggResult && aggResult.articles && aggResult.articles.length > 0) {
+          articles = aggResult.articles;
+          try { insertArticles(articles, aggResult.batchId); } catch {}
+          syncArticlesToAppwrite(articles, aggResult.batchId).catch(() => {});
+        }
+      } catch (err) {
+        console.warn('[Vercel /api/news] Explicit refresh error:', err.message);
       }
-    } catch (e) {
-      console.warn('[Vercel /api/news] Appwrite fetch note:', e.message);
     }
 
-    // 2. If Appwrite had 0 items, check SQLite cache
+    // 1. Try querying Appwrite Cloud if not already populated
+    if (articles.length === 0) {
+      try {
+        const appwriteDocs = await getArticlesFromAppwrite({
+          category,
+          type,
+          limit: numLimit,
+          page: numPage
+        });
+
+        if (appwriteDocs && appwriteDocs.length > 0) {
+          articles = appwriteDocs.map(d => ({
+            id: d.$id || d.id,
+            title: d.title,
+            slug: d.slug,
+            summary: d.summary || d.description,
+            description: d.description || d.summary,
+            content: d.content,
+            imageUrl: d.imageUrl,
+            sourceName: d.sourceName || d.source,
+            sourceUrl: d.sourceUrl || d.url,
+            authorName: d.authorName || d.author,
+            categoryId: d.categoryId || d.category,
+            categorySlug: d.categoryId || d.category,
+            providerId: d.provider,
+            language: d.language || 'en',
+            contentType: d.contentType || 'news',
+            sourceType: d.sourceType || 'external_news',
+            publishedAt: d.publishedAt,
+            publishedAtIST: d.publishedAtIST || formatIST(d.publishedAt),
+            expiresAt: d.expiresAt,
+            isBreaking: Boolean(d.isBreaking),
+            isFeatured: Boolean(d.isFeatured),
+            views: Number(d.views || 1),
+            readingTime: Number(d.readingTime || 3)
+          }));
+        }
+      } catch (e) {
+        console.warn('[Vercel /api/news] Appwrite fetch note:', e.message);
+      }
+    }
+
+    // 2. If Appwrite had 0 items, check SQLite/memory cache
     if (articles.length === 0) {
       try {
         const localActive = getActiveArticles(now);
@@ -78,16 +100,24 @@ export default async function handler(req, res) {
       }
     }
 
-    // 3. If STILL 0 items (first deployment or expired), trigger immediate on-demand aggregation!
-    if (articles.length === 0) {
-      console.log('[Vercel /api/news] Database empty, triggering on-demand aggregation...');
-      const aggResult = await aggregateRealWorldContent(30);
-      articles = aggResult.articles;
+    // 3. Staleness check: if the latest article is older than 20 minutes or list is empty, refresh
+    const newestTime = articles.length > 0 && articles[0].publishedAt ? new Date(articles[0].publishedAt).getTime() : 0;
+    const isStale = articles.length === 0 || (Date.now() - newestTime > 20 * 60 * 1000);
 
-      // Sync to Appwrite in background
-      syncArticlesToAppwrite(articles, aggResult.batchId).catch(err => {
-        console.warn('[Vercel /api/news] Background Appwrite sync note:', err.message);
-      });
+    if (isStale) {
+      console.log(`[Vercel /api/news] Articles are stale or empty (count=${articles.length}, newestAgeMin=${Math.round((Date.now() - newestTime) / 60000)}m), aggregating fresh news...`);
+      try {
+        const aggResult = await aggregateRealWorldContent(30);
+        if (aggResult && aggResult.articles && aggResult.articles.length > 0) {
+          articles = aggResult.articles;
+          try { insertArticles(articles, aggResult.batchId); } catch {}
+          syncArticlesToAppwrite(articles, aggResult.batchId).catch(err => {
+            console.warn('[Vercel /api/news] Background Appwrite sync note:', err.message);
+          });
+        }
+      } catch (err) {
+        console.warn('[Vercel /api/news] Fresh aggregation error:', err.message);
+      }
     }
 
     // Filter by category if requested

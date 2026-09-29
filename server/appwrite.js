@@ -37,17 +37,17 @@ let storage = null;
 let isConfigured = false;
 let resolvedEndpoint = 'https://cloud.appwrite.io/v1';
 let projectId = '';
-let databaseId = 'newsaxis-main';
-let bucketId = 'newsaxis-media';
+let databaseId = '6ab613fc0006b9fedac1';
+let bucketId = '6ab614cc0022aa43fab8';
 let lastSyncError = null;
 
 export function getAppwriteClient() {
   if (client) return { client, databases, storage, isConfigured, databaseId, bucketId };
 
-  projectId = process.env.APPWRITE_PROJECT_ID || process.env.VITE_APPWRITE_PROJECT_ID;
+  projectId = process.env.APPWRITE_PROJECT_ID || process.env.VITE_APPWRITE_PROJECT_ID || '6a854c5d0026a9224d01';
   const apiKey = process.env.APPWRITE_API_KEY;
-  databaseId = process.env.APPWRITE_DATABASE_ID || process.env.VITE_APPWRITE_DATABASE_ID || 'newsaxis-main';
-  bucketId = process.env.APPWRITE_BUCKET_ID || process.env.VITE_APPWRITE_BUCKET_ID || 'newsaxis-media';
+  databaseId = process.env.APPWRITE_DATABASE_ID || process.env.VITE_APPWRITE_DATABASE_ID || '6ab613fc0006b9fedac1';
+  bucketId = process.env.APPWRITE_BUCKET_ID || process.env.VITE_APPWRITE_BUCKET_ID || '6ab614cc0022aa43fab8';
   
   const envEndpoint = process.env.APPWRITE_ENDPOINT || process.env.VITE_APPWRITE_ENDPOINT;
   resolvedEndpoint = envEndpoint && !envEndpoint.includes('cloud.appwrite.io/v1') 
@@ -94,29 +94,28 @@ export function getSafeDocId(article) {
  * Normalizes article data to conform with Appwrite attributes
  */
 export function formatArticleForAppwrite(art) {
+  const now = new Date().toISOString();
+  const tagsStr = typeof art.tags === 'string'
+    ? art.tags.slice(0, 2000)
+    : JSON.stringify(Array.isArray(art.tags) ? art.tags : [art.categoryId || 'world']).slice(0, 2000);
+
   return {
-    title: (art.title || '').slice(0, 500),
-    slug: (art.slug || '').slice(0, 255),
-    description: (art.description || art.summary || '').slice(0, 2000),
-    summary: (art.summary || art.description || '').slice(0, 2000),
-    content: (art.content || art.summary || art.description || '').slice(0, 10000),
+    title: (art.title || 'Untitled News').trim().slice(0, 255),
+    slug: (art.slug || `news-${Date.now()}`).trim().slice(0, 150),
+    summary: (art.summary || art.description || '').trim().slice(0, 1000),
+    content: (art.content || art.summary || art.description || '').trim().slice(0, 50000),
     imageUrl: (art.imageUrl || art.image_url || '').slice(0, 1000),
-    source: (art.source || art.sourceName || 'NewsAxis').slice(0, 150),
-    sourceName: (art.sourceName || art.source || 'NewsAxis').slice(0, 150),
+    sourceName: (art.sourceName || art.source || 'NewsAxis').slice(0, 100),
     sourceUrl: (art.sourceUrl || art.url || '').slice(0, 1000),
-    url: (art.sourceUrl || art.url || '').slice(0, 1000),
-    author: (art.author || art.authorName || 'Staff').slice(0, 150),
-    authorName: (art.authorName || art.author || 'Staff').slice(0, 150),
+    authorName: (art.authorName || art.author || 'Staff').slice(0, 100),
     authorId: (art.authorId || '').slice(0, 100),
-    category: (art.category || art.categoryId || 'world').slice(0, 100),
-    categoryId: (art.categoryId || art.category || 'world').slice(0, 100),
-    provider: (art.provider || art.providerId || 'rss').slice(0, 100),
-    language: (art.language || 'en').slice(0, 20),
-    contentType: (art.contentType || 'news').slice(0, 50),
+    categoryId: (art.categoryId || art.category || 'world').slice(0, 50),
+    contentType: (art.contentType || 'news').slice(0, 20),
     sourceType: (art.sourceType || 'external_news').slice(0, 50),
-    publishedAt: art.publishedAt || art.published_at || new Date().toISOString(),
-    createdAt: art.createdAt || new Date().toISOString(),
-    expiresAt: art.expiresAt || new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    tags: tagsStr,
+    publishedAt: (art.publishedAt || art.published_at || now).slice(0, 50),
+    createdAt: (art.createdAt || now).slice(0, 50),
+    expiresAt: (art.expiresAt || new Date(Date.now() + 30 * 60 * 1000).toISOString()).slice(0, 50),
     isBreaking: Boolean(art.isBreaking),
     isFeatured: Boolean(art.isFeatured),
     views: Number(art.views || 1),
@@ -153,14 +152,14 @@ export async function syncArticlesToAppwrite(articles = [], batchId = '') {
 
         try {
           try {
-            await databases.updateDocument(databaseId, ARTICLES_COLLECTION_ID, docId, data);
-            updated++;
-          } catch (updateErr) {
-            if (updateErr.code === 404) {
-              await databases.createDocument(databaseId, ARTICLES_COLLECTION_ID, docId, data);
-              synced++;
+            await databases.createDocument(databaseId, ARTICLES_COLLECTION_ID, docId, data);
+            synced++;
+          } catch (createErr) {
+            if (createErr.code === 409) {
+              await databases.updateDocument(databaseId, ARTICLES_COLLECTION_ID, docId, data);
+              updated++;
             } else {
-              throw updateErr;
+              throw createErr;
             }
           }
         } catch (err) {
