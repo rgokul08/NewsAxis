@@ -8,7 +8,6 @@ describe('NewsAxisLoader Component', () => {
   });
 
   test('default props structure and contracts are preserved', () => {
-    // Verify component accepts minDuration and onComplete contracts
     expect(NewsAxisLoader.length).toBeGreaterThanOrEqual(0);
   });
 });

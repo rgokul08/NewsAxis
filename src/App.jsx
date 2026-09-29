@@ -35,7 +35,7 @@ export function App() {
     <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
       {loading && (
         <NewsAxisLoader
-          minDuration={2200}
+          minDuration={4000}
           onComplete={() => setLoading(false)}
         />
       )}

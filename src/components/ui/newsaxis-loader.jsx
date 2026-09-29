@@ -1,1 +1,1 @@
-export { NewsAxisLoader, default } from './NewsAxisLoader';
+export { NewsAxisLoader, default } from './NewsAxisLoader.jsx';
