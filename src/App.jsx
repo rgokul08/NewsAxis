@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Header } from './components/navigation/Header';
 import { Footer } from './components/layout/Footer';
+import { NewsAxisLoader } from './components/ui/NewsAxisLoader';
 import { HomePage } from './pages/HomePage';
 import { ArticlePage } from './pages/ArticlePage';
 import { CategoryPage } from './pages/CategoryPage';
@@ -28,8 +29,16 @@ function AdminRoute({ children }) {
 }
 
 export function App() {
+  const [loading, setLoading] = useState(true);
+
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
+      {loading && (
+        <NewsAxisLoader
+          minDuration={4000}
+          onComplete={() => setLoading(false)}
+        />
+      )}
       <Header />
       <div className="flex-1">
         <Routes>

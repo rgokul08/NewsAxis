@@ -248,7 +248,7 @@ export function LiveNewsPlayerView({
         </div>
 
         {/* Right Column: SIDE CHANNEL MENU BAR (4 cols) */}
-        <div className="lg:col-span-4 flex flex-col bg-slate-900 border-slate-800 h-[460px] lg:h-[580px] overflow-hidden">
+        <div className="lg:col-span-4 flex flex-col bg-slate-900 border-slate-800 h-[350px] sm:h-[420px] lg:h-[580px] overflow-hidden">
           {/* Menu Header with Region Filters */}
           <div className="p-3 bg-slate-950 border-b border-slate-800 space-y-2.5">
             <div className="flex items-center justify-between">

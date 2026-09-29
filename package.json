@@ -23,6 +23,7 @@
     "date-fns": "^4.4.0",
     "dompurify": "^3.4.16",
     "express": "^5.2.1",
+    "framer-motion": "^13.4.5",
     "lucide-react": "^1.47.0",
     "node-appwrite": "^29.0.0",
     "react": "^19.2.8",
@@ -39,6 +40,7 @@
     "concurrently": "^10.0.5",
     "oxlint": "^1.81.0",
     "postcss": "^8.5.28",
+    "sharp": "^0.35.5",
     "tailwindcss": "^4.3.3",
     "vite": "^8.3.0",
     "vitest": "^5.0.1"
