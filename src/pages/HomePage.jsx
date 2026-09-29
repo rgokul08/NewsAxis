@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
-  TrendingUp, Sparkles, Flame, 
-  ArrowRight, ShieldCheck, Mail, ChevronRight, MapPin,
-  Clock, RefreshCw, Radio, Layers, BookOpen, Code2, CheckCircle2
+  ArrowRight, ChevronRight, MapPin,
+  RefreshCw, Radio, Code2, CheckCircle2
 } from 'lucide-react';
 import { articleService } from '../services/articleService';
 import { ArticleCard } from '../components/article/ArticleCard';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { LiveBreakingTicker } from '../components/live/LiveBreakingTicker';
-import { LiveNewsModal, LiveNewsSection, LIVE_NEWS_CHANNELS } from '../components/live/LiveNewsPlayer';
+import { LiveNewsModal, LiveNewsSection } from '../components/live/LiveNewsPlayer';
 import { formatIST } from '../utils/istDate';
 
 export function HomePage() {
@@ -294,9 +293,9 @@ export function HomePage() {
         ) : (
           <>
             {/* 2. THE HINDU 3-COLUMN LEAD EDITORIAL GRID */}
-            <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 pt-2 pb-6 border-b-2 border-[#111827] dark:border-[#30363d]">
-              {/* Column 1: Left Wire Stories (3 Cols) */}
-              <div className="lg:col-span-3 space-y-4 border-b lg:border-b-0 lg:border-r border-[#e5e7eb] dark:border-[#30363d] pr-0 lg:pr-6">
+            <section className="grid grid-cols-1 md:grid-cols-12 lg:grid-cols-12 gap-6 pt-2 pb-6 border-b-2 border-[#111827] dark:border-[#30363d]">
+              {/* Column 1: Left Wire Stories (3 Cols on desktop, 6 Cols on tablet) */}
+              <div className="col-span-1 md:col-span-6 lg:col-span-3 space-y-4 border-b md:border-b-0 md:border-r border-[#e5e7eb] dark:border-[#30363d] pr-0 md:pr-4 lg:pr-6 order-2 lg:order-1">
                 <div className="flex items-center justify-between border-b border-[#a91b0d] pb-1">
                   <h3 className="text-xs font-sans-clean font-black uppercase tracking-wider text-[#a91b0d] dark:text-rose-400">
                     Live Wire Dispatches
@@ -310,8 +309,8 @@ export function HomePage() {
                 </div>
               </div>
 
-              {/* Column 2: Center Big Lead Headline (6 Cols) */}
-              <div className="lg:col-span-6">
+              {/* Column 2: Center Big Lead Headline (6 Cols on desktop, 12 Cols on tablet, top on mobile) */}
+              <div className="col-span-1 md:col-span-12 lg:col-span-6 order-1 lg:order-2">
                 {leadStory ? (
                   <ArticleCard article={leadStory} lead showExpiration />
                 ) : (
@@ -319,8 +318,8 @@ export function HomePage() {
                 )}
               </div>
 
-              {/* Column 3: Right Opinion & Visual Spot (3 Cols) */}
-              <div className="lg:col-span-3 space-y-4 border-t lg:border-t-0 lg:border-l border-[#e5e7eb] dark:border-[#30363d] pl-0 lg:pl-6">
+              {/* Column 3: Right Opinion & Visual Spot (3 Cols on desktop, 6 Cols on tablet) */}
+              <div className="col-span-1 md:col-span-6 lg:col-span-3 space-y-4 border-t md:border-t-0 md:border-l lg:border-l border-[#e5e7eb] dark:border-[#30363d] pl-0 md:pl-4 lg:pl-6 order-3 lg:order-3">
                 <div className="bg-[#f8f9fa] dark:bg-[#161b22] border border-[#e5e7eb] dark:border-[#30363d] p-4 text-center space-y-2 rounded-sm">
                   <span className="text-[10px] font-sans-clean font-bold tracking-widest text-[#a91b0d] dark:text-rose-400 uppercase flex items-center justify-center gap-1">
                     <Radio className="w-3 h-3 animate-pulse" /> 30-MIN APPWRITE SNAPSHOT

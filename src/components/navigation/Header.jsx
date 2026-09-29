@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { 
-  Search, Moon, Sun, Bookmark, PenSquare, 
-  Menu, X, User, ChevronDown, BookOpen, MapPin, 
-  Sparkles, RefreshCw
+  Search, Moon, Sun, Bookmark, 
+  Menu, User, ChevronDown, BookOpen, MapPin, 
+  RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -134,7 +134,7 @@ export function Header() {
           </div>
 
           {/* Right Column: Login, eBooks, Theme Toggle, Subscribe */}
-          <div className="col-span-12 md:col-span-3 flex flex-col items-end gap-2 text-xs font-sans-clean order-3">
+          <div className="col-span-12 md:col-span-3 flex flex-row md:flex-col items-center md:items-end justify-between md:justify-start gap-2 text-xs font-sans-clean order-3 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100 dark:border-slate-800/60">
             
             {/* Top Right: Login state */}
             <div>
@@ -182,7 +182,7 @@ export function Header() {
             </div>
 
             {/* Bottom Right: eBooks, Theme, Subscribe Button */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5 sm:gap-3">
               <Link 
                 to="/blogs" 
                 className="hidden sm:flex items-center gap-1 text-slate-600 dark:text-slate-400 hover:text-[#a91b0d] dark:hover:text-rose-400 transition-colors text-[11px]"
@@ -243,7 +243,7 @@ export function Header() {
           </div>
 
           {/* Center Category Links */}
-          <div className="flex items-center gap-5 sm:gap-6 lg:gap-7 overflow-x-auto scrollbar-none whitespace-nowrap text-[13px] sm:text-[14px] font-medium">
+          <div className="flex items-center gap-4 sm:gap-6 lg:gap-7 overflow-x-auto scrollbar-none whitespace-nowrap text-[13px] sm:text-[14px] font-medium">
             <Link to="/category/india" className="text-[#111827] dark:text-[#f0f6fc] hover:text-[#a91b0d] dark:hover:text-rose-400 transition-colors">
               India
             </Link>
@@ -263,9 +263,9 @@ export function Header() {
               <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-ping" />
               <span>LIVE TV</span>
             </button>
-            <Link to="/blogs" className="text-emerald-700 dark:text-emerald-400 hover:underline transition-colors flex items-center gap-1 font-bold">
+            <Link to="/blogs" className="text-[#111827] dark:text-[#f0f6fc] hover:text-[#a91b0d] dark:hover:text-rose-400 transition-colors flex items-center gap-1 font-semibold">
               <span>Dev Blogs</span>
-              <span className="text-[10px] bg-emerald-100 dark:bg-emerald-950 px-1 py-0.2 rounded text-emerald-800 dark:text-emerald-300">LIVE</span>
+              <span className="text-[10px] bg-[#a91b0d]/10 dark:bg-rose-950/40 px-1.5 py-0.5 rounded text-[#a91b0d] dark:text-rose-300 font-bold">LIVE</span>
             </Link>
             <Link to="/category/business" className="text-[#111827] dark:text-[#f0f6fc] hover:text-[#a91b0d] dark:hover:text-rose-400 transition-colors">
               Business
