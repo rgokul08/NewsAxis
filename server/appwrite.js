@@ -37,17 +37,17 @@ let storage = null;
 let isConfigured = false;
 let resolvedEndpoint = 'https://cloud.appwrite.io/v1';
 let projectId = '';
-let databaseId = 'newsaxis-main';
-let bucketId = 'newsaxis-media';
+let databaseId = '6ab613fc0006b9fedac1';
+let bucketId = '6ab614cc0022aa43fab8';
 let lastSyncError = null;
 
 export function getAppwriteClient() {
   if (client) return { client, databases, storage, isConfigured, databaseId, bucketId };
 
-  projectId = process.env.APPWRITE_PROJECT_ID || process.env.VITE_APPWRITE_PROJECT_ID;
+  projectId = process.env.APPWRITE_PROJECT_ID || process.env.VITE_APPWRITE_PROJECT_ID || '6a854c5d0026a9224d01';
   const apiKey = process.env.APPWRITE_API_KEY;
-  databaseId = process.env.APPWRITE_DATABASE_ID || process.env.VITE_APPWRITE_DATABASE_ID || 'newsaxis-main';
-  bucketId = process.env.APPWRITE_BUCKET_ID || process.env.VITE_APPWRITE_BUCKET_ID || 'newsaxis-media';
+  databaseId = process.env.APPWRITE_DATABASE_ID || process.env.VITE_APPWRITE_DATABASE_ID || '6ab613fc0006b9fedac1';
+  bucketId = process.env.APPWRITE_BUCKET_ID || process.env.VITE_APPWRITE_BUCKET_ID || '6ab614cc0022aa43fab8';
   
   const envEndpoint = process.env.APPWRITE_ENDPOINT || process.env.VITE_APPWRITE_ENDPOINT;
   resolvedEndpoint = envEndpoint && !envEndpoint.includes('cloud.appwrite.io/v1') 

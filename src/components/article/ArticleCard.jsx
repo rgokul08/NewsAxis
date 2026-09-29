@@ -3,12 +3,16 @@ import { Link } from 'react-router-dom';
 import { Bookmark, Clock, Flame, ExternalLink, Sparkles } from 'lucide-react';
 import { articleService } from '../../services/articleService';
 import { formatISTShort } from '../../utils/istDate';
-import { getDynamicArticleImage } from '../../utils/dynamicImage';
+import { getDynamicArticleImage, isGenericPlaceholder } from '../../utils/dynamicImage';
 
 export function ArticleCard({ article, compact = false, showExpiration = true, lead = false }) {
   const [isBookmarked, setIsBookmarked] = useState(() => articleService.isBookmarked(article?.id));
 
   if (!article) return null;
+
+  const displayImage = (!article.imageUrl || isGenericPlaceholder(article.imageUrl))
+    ? getDynamicArticleImage(article.title, article.categorySlug || article.categoryId, article.id)
+    : article.imageUrl;
 
   const handleBookmarkToggle = (e) => {
     e.preventDefault();
@@ -125,7 +129,7 @@ export function ArticleCard({ article, compact = false, showExpiration = true, l
 
         <Link to={articleLink} className="block aspect-[16/10] overflow-hidden bg-slate-100 dark:bg-slate-800 rounded-sm my-3 shadow-xs">
           <img
-            src={article.imageUrl || getDynamicArticleImage(article.title, article.categorySlug || article.categoryId, article.id)}
+            src={displayImage}
             alt={article.title}
             className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"
             onError={(e) => {
@@ -162,7 +166,7 @@ export function ArticleCard({ article, compact = false, showExpiration = true, l
       <div className="space-y-2">
         <Link to={articleLink} className="block aspect-[16/10] w-full overflow-hidden bg-slate-100 dark:bg-slate-800 rounded-sm mb-2 shadow-2xs">
           <img
-            src={article.imageUrl || getDynamicArticleImage(article.title, article.categorySlug || article.categoryId, article.id)}
+            src={displayImage}
             alt={article.title}
             loading="lazy"
             className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500"

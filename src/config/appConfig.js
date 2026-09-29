@@ -37,10 +37,10 @@ export const APP_CONFIG = {
 
   // Appwrite Config
   appwrite: {
-    endpoint: import.meta.env.VITE_APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1',
-    projectId: import.meta.env.VITE_APPWRITE_PROJECT_ID || 'newsaxis-prod',
-    databaseId: import.meta.env.VITE_APPWRITE_DATABASE_ID || 'newsaxis-main',
-    storageBucketId: import.meta.env.VITE_APPWRITE_BUCKET_ID || 'newsaxis-media',
+    endpoint: import.meta.env.VITE_APPWRITE_ENDPOINT || 'https://sgp.cloud.appwrite.io/v1',
+    projectId: import.meta.env.VITE_APPWRITE_PROJECT_ID || '6a854c5d0026a9224d01',
+    databaseId: import.meta.env.VITE_APPWRITE_DATABASE_ID || '6ab613fc0006b9fedac1',
+    storageBucketId: import.meta.env.VITE_APPWRITE_BUCKET_ID || '6ab614cc0022aa43fab8',
     collections: {
       profiles: 'profiles',
       articles: 'articles',

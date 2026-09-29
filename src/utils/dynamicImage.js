@@ -328,3 +328,21 @@ export function isValidImageUrl(url) {
 
   return true;
 }
+
+/**
+ * Checks whether an image URL is an old static stock placeholder or empty,
+ * requiring replacement with dynamic topic-matched photography.
+ */
+export function isGenericPlaceholder(url) {
+  if (!url || typeof url !== 'string') return true;
+  const lower = url.trim().toLowerCase();
+  return (
+    lower.includes('photo-1585829365295-ab7cd400c167') || // generic newspaper stock
+    lower.includes('photo-1504711434969-e33886168f5c') || // generic articles stock
+    lower.includes('photo-1499750310107-5fef28a66643') || // generic dev laptop stock
+    lower.includes('placeholder') ||
+    lower.includes('default-image') ||
+    lower.includes('dummy') ||
+    lower.length < 10
+  );
+}

@@ -9,7 +9,7 @@ import { articleService } from '../services/articleService';
 import { ArticleCard } from '../components/article/ArticleCard';
 import { useGeolocation } from '../hooks/useGeolocation';
 import { LiveBreakingTicker } from '../components/live/LiveBreakingTicker';
-import { LiveNewsModal, LIVE_NEWS_CHANNELS } from '../components/live/LiveNewsPlayer';
+import { LiveNewsModal, LiveNewsSection, LIVE_NEWS_CHANNELS } from '../components/live/LiveNewsPlayer';
 import { formatIST } from '../utils/istDate';
 
 export function HomePage() {
@@ -145,7 +145,7 @@ export function HomePage() {
   };
 
   const filteredItems = getFilteredStories();
-  const leadStory = feed.featured || feed.all[0];
+  const leadStory = feed.all[0] || feed.featured || null;
   const sideStories = feed.latest.slice(0, 4);
   const secondaryStories = feed.all.slice(1, 4);
   const devBlogs = feed.all.filter(a => a.contentType === 'blog' || a.sourceType.includes('blog')).slice(0, 6);
@@ -223,64 +223,12 @@ export function HomePage() {
           ))}
         </div>
 
-        {/* When activeFilter is 'live', render dedicated Live News Broadcast Gallery */}
+        {/* When activeFilter is 'live', render dedicated Live Television Section with side channel menu bar */}
         {activeFilter === 'live' ? (
-          <section className="space-y-6 pt-2 pb-8">
-            <div className="flex items-center justify-between border-b-2 border-red-600 pb-2">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-red-600 animate-ping" />
-                <h2 className="font-headline text-2xl font-bold uppercase tracking-tight text-red-600 dark:text-red-400">
-                  Free 24/7 Real-World Live News Broadcasts
-                </h2>
-              </div>
-              <button 
-                onClick={() => setActiveFilter('all')}
-                className="text-xs text-[#a91b0d] dark:text-rose-400 font-bold hover:underline cursor-pointer"
-              >
-                Back to Front Page &rarr;
-              </button>
-            </div>
-
-            <p className="text-sm text-slate-600 dark:text-slate-400 max-w-2xl">
-              Watch real-time live television broadcasts directly from world-renowned news agencies. Zero cost, no sign-up needed.
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {LIVE_NEWS_CHANNELS.map(channel => (
-                <div 
-                  key={channel.id}
-                  className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
-                >
-                  <div className="p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 font-mono flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse" />
-                        LIVE STREAM
-                      </span>
-                      <span className="text-xs text-slate-500 font-medium">{channel.country}</span>
-                    </div>
-
-                    <h3 className="font-serif font-bold text-lg text-slate-900 dark:text-white">
-                      {channel.name}
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
-                      {channel.description}
-                    </p>
-                  </div>
-
-                  <div className="p-4 pt-0">
-                    <button
-                      onClick={() => openLiveStream(channel.id)}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-sm transition-all cursor-pointer"
-                    >
-                      <Radio className="w-4 h-4" />
-                      <span>Watch Live Broadcast</span>
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+          <LiveNewsSection 
+            initialChannelId={selectedChannelId || 'sky_news'}
+            onBackToHome={() => setActiveFilter('all')} 
+          />
         ) : activeFilter !== 'all' ? (
           <section className="space-y-4 pt-2 pb-8">
             <div className="flex items-center justify-between border-b-2 border-[#111827] dark:border-[#30363d] pb-2">

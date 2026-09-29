@@ -7,20 +7,13 @@ import { APP_CONFIG } from '../config/appConfig';
 const client = new Client();
 
 const isConfigured = Boolean(
-  import.meta.env.VITE_APPWRITE_PROJECT_ID && 
-  import.meta.env.VITE_APPWRITE_PROJECT_ID !== 'newsaxis-prod'
+  APP_CONFIG.appwrite.projectId && 
+  APP_CONFIG.appwrite.projectId !== 'newsaxis-prod'
 );
 
-if (isConfigured) {
-  client
-    .setEndpoint(APP_CONFIG.appwrite.endpoint)
-    .setProject(APP_CONFIG.appwrite.projectId);
-} else {
-  // Configured with default endpoint to allow graceful client initialization
-  client
-    .setEndpoint(APP_CONFIG.appwrite.endpoint)
-    .setProject(APP_CONFIG.appwrite.projectId);
-}
+client
+  .setEndpoint(APP_CONFIG.appwrite.endpoint)
+  .setProject(APP_CONFIG.appwrite.projectId);
 
 export const account = new Account(client);
 export const databases = new Databases(client);
